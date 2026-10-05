@@ -1,0 +1,16 @@
+{
+  "name": "facinect/identity",
+  "description": "Facinect identity / auth microservice",
+  "type": "project",
+  "require": {
+    "php": "^8.2",
+    "slim/slim": "^4.14",
+    "slim/psr7": "^1.7",
+    "firebase/php-jwt": "^7.2"
+  },
+  "autoload": {
+    "psr-4": {
+      "Facinect\\Identity\\": "src/"
+    }
+  }
+}

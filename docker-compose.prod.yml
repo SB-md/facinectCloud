@@ -1,0 +1,158 @@
+# Facinect production / VPS compose
+# Coexists with RoutForge (uses 8080) and other stacks on the same Hostinger VPS.
+#
+# Usage on VPS:
+#   cp .env.prod.example .env.prod
+#   # edit .env.prod — strong passwords, Google OAuth, domain URLs
+#   ./scripts/generate-jwt-keys.sh
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+#   ./scripts/migrate.sh
+#
+# Access (until domain/HTTPS reverse proxy):
+#   http://VPS_IP:8081/
+
+services:
+  gateway:
+    image: traefik:v3.2
+    container_name: facinect-gateway
+    ports:
+      # Avoid RoutForge gateway on host :8080
+      - "8081:80"
+      # Traefik dashboard: localhost only (SSH tunnel if needed)
+      - "127.0.0.1:8088:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./gateway/traefik.prod.yml:/etc/traefik/traefik.yml:ro
+      - ./gateway/dynamic.yml:/etc/traefik/dynamic.yml:ro
+    networks:
+      - facinect_internal
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: facinect-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_IDENTITY_DB}
+      POSTGRES_USER: ${POSTGRES_IDENTITY_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_IDENTITY_PASSWORD}
+    # No host port — do not collide with RoutForge :5432 or expose DB publicly
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./sql/01_fac_identity.sql:/docker-entrypoint-initdb.d/01_fac_identity.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_IDENTITY_USER} -d ${POSTGRES_IDENTITY_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - facinect_internal
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: facinect-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    # No host port — internal only
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      - facinect_internal
+    restart: unless-stopped
+
+  identity:
+    build:
+      context: ./services/identity
+      dockerfile: Dockerfile
+    container_name: facinect-identity
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      HTTP_ADDR: ":8080"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: ${POSTGRES_IDENTITY_DB}
+      DB_USER: ${POSTGRES_IDENTITY_USER}
+      DB_PASSWORD: ${POSTGRES_IDENTITY_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_PRIVATE_KEY_PATH: /keys/jwt_private.pem
+      JWT_PUBLIC_KEY_PATH: /keys/jwt_public.pem
+      JWT_ISSUER: ${JWT_ISSUER}
+      JWT_AUDIENCE: ${JWT_AUDIENCE}
+      JWT_ACCESS_TTL_SECONDS: ${JWT_ACCESS_TTL_SECONDS}
+      JWT_REFRESH_TTL_SECONDS: ${JWT_REFRESH_TTL_SECONDS}
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD}
+      BOOTSTRAP_ADMIN_NAME: ${BOOTSTRAP_ADMIN_NAME}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_OAUTH_REDIRECT_URI: ${GOOGLE_OAUTH_REDIRECT_URI}
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+    volumes:
+      - ./keys:/keys:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/v1/auth/health | grep -q '\"status\":\"ok\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=facinect_internal
+      - traefik.http.routers.identity.rule=PathPrefix(`/v1/auth`)
+      - traefik.http.routers.identity.entrypoints=web
+      - traefik.http.routers.identity.priority=20
+      - traefik.http.routers.identity.middlewares=rate-auth@file
+      - traefik.http.services.identity.loadbalancer.server.port=8080
+    networks:
+      - facinect_internal
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    container_name: facinect-web
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: "0.0.0.0"
+    depends_on:
+      identity:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health | grep -q '\"status\":\"ok\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=facinect_internal
+      - traefik.http.routers.web.rule=PathPrefix(`/`)
+      - traefik.http.routers.web.entrypoints=web
+      - traefik.http.routers.web.priority=10
+      - traefik.http.services.web.loadbalancer.server.port=3000
+    networks:
+      - facinect_internal
+    restart: unless-stopped
+
+networks:
+  facinect_internal:
+    name: facinect_internal
+    driver: bridge
+
+volumes:
+  postgres_data:
+    name: facinect_postgres_data
+  redis_data:
+    name: facinect_redis_data

@@ -1,0 +1,48 @@
+.wrap {
+  min-height: 100vh;
+  background: linear-gradient(165deg, #f3f7f5 0%, #e8efeb 45%, #f7faf8 100%);
+  color: #16352c;
+}
+
+.header {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 28px 24px 8px;
+}
+
+.brand {
+  display: inline-block;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #0f3d32;
+  text-decoration: none;
+  margin-bottom: 12px;
+}
+
+.header h1 {
+  margin: 8px 0 6px;
+  font-size: 1.6rem;
+  font-weight: 600;
+}
+
+.header p {
+  margin: 0;
+  color: #4a635b;
+  font-size: 0.95rem;
+}
+
+.swagger {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 8px 12px 40px;
+}
+
+.swagger :global(.swagger-ui .topbar) {
+  display: none;
+}
+
+.swagger :global(.swagger-ui .info) {
+  margin: 12px 0;
+}

@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Secure Login</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <style>
+    body { font-family: 'Poppins', sans-serif; background: #f4f7f9; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 16px; }
+    .login-box { background: white; padding: 40px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); width: 100%; max-width: 400px; text-align: center; position: relative; }
+    .logo-mark { width: 56px; height: 56px; margin: 0 auto 16px; border-radius: 14px; background: linear-gradient(135deg, #00aeef, #8cc63f); }
+    h1 { font-size: 24px; color: #333; margin: 0 0 18px; }
+    .input-group { text-align: left; margin-bottom: 15px; position: relative; }
+    label { font-size: 13px; color: #666; display: block; margin-bottom: 5px; }
+    input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 15px; outline: none; }
+    input:focus { border-color: #2b6cb0; }
+    #verifyIcon { display: none; color: #28a745; font-size: 20px; position: absolute; right: 12px; top: 35px; }
+    .btn { width: 100%; padding: 12px; background: #2b6cb0; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; margin-top: 10px; transition: 0.3s; font-family: inherit; text-decoration: none; display: inline-block; box-sizing: border-box; }
+    .btn:hover { background: #1e4e8c; }
+    .btn:disabled { opacity: .65; cursor: wait; }
+    .btn-google { display: flex; align-items: center; justify-content: center; gap: 10px; background: #fff; color: #444; border: 1px solid #dadce0; }
+    .btn-google:hover { background: #f8f9fa; color: #222; }
+    .btn-google img { width: 20px; height: 20px; }
+    #passwordArea { display: none; margin-top: 15px; animation: fadeIn 0.5s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+    .divider { margin: 25px 0; border-bottom: 1px solid #eee; position: relative; }
+    .divider span { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: white; padding: 0 10px; color: #aaa; font-size: 12px; }
+    .msg { margin-top: 14px; font-size: 13px; color: #666; min-height: 1.2em; white-space: pre-wrap; word-break: break-word; }
+    .msg.ok { color: #15803d; }
+    .msg.error { color: #d9534f; }
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
+    .modal-content { background: white; padding: 30px; border-radius: 12px; text-align: center; width: 90%; max-width: 350px; }
+    .modal-content i { font-size: 50px; margin-bottom: 15px; }
+    .modal-content h3 { margin: 0 0 10px; color: #333; }
+    .modal-content p { color: #666; font-size: 14px; margin-bottom: 20px; }
+    .modal-close { background: #d9534f; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-weight: 600; }
+    .hint { margin-top: 18px; font-size: 11px; color: #999; line-height: 1.4; }
+  </style>
+</head>
+<body>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal-content">
+    <i class="fa-solid fa-circle-exclamation" style="color:#d9534f;"></i>
+    <h3>Not Registered</h3>
+    <p>This email is not registered in our system. Please use Google sign-in or contact support.</p>
+    <button class="modal-close" type="button" onclick="closeModal('modalOverlay')">OK</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="pwErrorModal">
+  <div class="modal-content">
+    <i class="fa-solid fa-key" style="color:#f0ad4e;"></i>
+    <h3>Incorrect Password</h3>
+    <p>The password you entered is incorrect. Please try again.</p>
+    <button class="modal-close" type="button" style="background:#f0ad4e;" onclick="closeModal('pwErrorModal')">Try Again</button>
+  </div>
+</div>
+
+<div class="login-box">
+  <div class="logo-mark" aria-hidden="true"></div>
+  <h1>Sign In</h1>
+
+  <form id="loginForm">
+    <div class="input-group">
+      <label>Email Address</label>
+      <input type="email" id="email" name="email" placeholder="Enter your email" required value="admin@facinect.local">
+      <i class="fa-solid fa-circle-check" id="verifyIcon"></i>
+    </div>
+    <button type="button" id="nextBtn" class="btn">Next</button>
+    <div id="passwordArea">
+      <div class="input-group">
+        <label>Password</label>
+        <input type="password" name="password" id="password" placeholder="••••••••" value="ChangeMe_Admin_123!">
+      </div>
+      <button type="submit" class="btn" id="signInBtn">Sign In</button>
+    </div>
+  </form>
+
+  <div class="divider"><span>OR</span></div>
+  <a href="/v1/auth/google/start" class="btn btn-google" id="googleSignInBtn">
+    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="" loading="lazy" decoding="async">
+    Sign in with Google
+  </a>
+
+  <p class="msg" id="msg" aria-live="polite"></p>
+  <p class="hint">Facinect identity · local gateway<br>Google redirect must allow<br><code>http://localhost:8080/v1/auth/google/callback</code></p>
+</div>
+
+<script>
+  const AUTH_ERRORS = {
+    oauth_denied: 'Google sign-in was cancelled.',
+    oauth_failed: 'Google sign-in failed. Please try again.',
+    oauth_exchange_failed: 'Could not complete Google sign-in. Try again.',
+    oauth_bad_secret: 'Server Google client secret is missing or wrong. Set GOOGLE_CLIENT_SECRET in .env',
+    oauth_redirect_mismatch: 'Redirect URI mismatch. Add exactly:\nhttp://localhost:8080/v1/auth/google/callback',
+    oauth_expired: 'Sign-in session expired. Please try again.',
+    invalid_state: 'Security check failed. Please try again.',
+    email_not_verified: 'Your Google email is not verified.',
+    oauth_config: 'Google login is not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env',
+    invalid_credentials: 'Incorrect email or password.',
+    unauthorized: 'This account is not allowed to sign in.',
+    invalid_handoff: 'Google sign-in handoff expired. Please try again.',
+  };
+
+  function closeModal(id) {
+    document.getElementById(id).style.display = 'none';
+  }
+
+  function setMsg(text, type) {
+    const el = document.getElementById('msg');
+    el.textContent = text || '';
+    el.className = 'msg' + (type ? ' ' + type : '');
+  }
+
+  function showAuthError(code) {
+    const message = AUTH_ERRORS[code] || ('Login failed: ' + code);
+    if (code === 'invalid_credentials') {
+      document.getElementById('pwErrorModal').style.display = 'flex';
+      return;
+    }
+    alert(message);
+    setMsg(message, 'error');
+  }
+
+  function storeSession(data) {
+    sessionStorage.setItem('facinect_access_token', data.access_token || '');
+    sessionStorage.setItem('facinect_refresh_token', data.refresh_token || '');
+    sessionStorage.setItem('facinect_user', JSON.stringify(data.user || {}));
+  }
+
+  (async function boot() {
+    const params = new URLSearchParams(window.location.search);
+    const error = params.get('error');
+    if (error) {
+      showAuthError(error);
+      history.replaceState({}, '', '/login');
+      return;
+    }
+    const handoff = params.get('handoff');
+    if (params.get('google') === '1' && handoff) {
+      setMsg('Completing Google sign-in…');
+      try {
+        const res = await fetch('/v1/auth/google/handoff', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({ handoff }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'oauth_failed');
+        storeSession(data);
+        history.replaceState({}, '', '/login');
+        setMsg('Signed in with Google as ' + (data.user?.full_name || data.user?.email || 'user'), 'ok');
+      } catch (e) {
+        showAuthError(String(e.message || e));
+        history.replaceState({}, '', '/login');
+      }
+    }
+  })();
+
+  const nextBtn = document.getElementById('nextBtn');
+  const emailInput = document.getElementById('email');
+  const passwordArea = document.getElementById('passwordArea');
+  const verifyIcon = document.getElementById('verifyIcon');
+
+  nextBtn.onclick = async function () {
+    const email = emailInput.value.trim();
+    if (!email) return;
+    nextBtn.disabled = true;
+    setMsg('Checking email…');
+    try {
+      const res = await fetch('/v1/auth/check-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'check_failed');
+      if (!data.exists) {
+        document.getElementById('modalOverlay').style.display = 'flex';
+        setMsg('Email not found for password login. Use Google, or create the user first.', 'error');
+        return;
+      }
+      verifyIcon.style.display = 'block';
+      passwordArea.style.display = 'block';
+      nextBtn.style.display = 'none';
+      setMsg('');
+    } catch (e) {
+      setMsg(String(e.message || e), 'error');
+    } finally {
+      nextBtn.disabled = false;
+    }
+  };
+
+  document.getElementById('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('signInBtn');
+    btn.disabled = true;
+    setMsg('Signing in…');
+    try {
+      const res = await fetch('/v1/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({
+          email: emailInput.value.trim(),
+          password: document.getElementById('password').value,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showAuthError(data.error || 'invalid_credentials');
+        return;
+      }
+      storeSession(data);
+      setMsg('Signed in as ' + (data.user?.full_name || data.user?.email), 'ok');
+    } catch (err) {
+      setMsg(String(err.message || err), 'error');
+    } finally {
+      btn.disabled = false;
+    }
+  });
+</script>
+</body>
+</html>

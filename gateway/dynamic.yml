@@ -1,0 +1,11 @@
+# Extra routes / middlewares (Docker labels also apply)
+http:
+  middlewares:
+    strip-auth-prefix:
+      stripPrefix:
+        prefixes:
+          - "/v1/auth"
+    rate-auth:
+      rateLimit:
+        average: 30
+        burst: 60

@@ -1,0 +1,22 @@
+# Traefik for VPS / production (Facinect)
+# Dashboard: insecure only on loopback via compose port bind 127.0.0.1:8088
+
+api:
+  dashboard: true
+  insecure: true
+
+entryPoints:
+  web:
+    address: ":80"
+
+providers:
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false
+    network: facinect_internal
+  file:
+    filename: /etc/traefik/dynamic.yml
+    watch: true
+
+log:
+  level: INFO

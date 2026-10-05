@@ -1,0 +1,7 @@
+.git
+**/node_modules
+**/.next
+**/vendor
+identity-php
+*.md
+.env
