@@ -14,9 +14,10 @@ ENV_FILE="${ENV_FILE:-.env.prod}"
 COMPOSE=(docker compose -f docker-compose.prod.yml --env-file "$ENV_FILE")
 
 if [[ ! -f "$ENV_FILE" ]]; then
-  echo "error: $ENV_FILE missing — cp .env.prod.example .env.prod && edit secrets" >&2
+  echo "error: $ENV_FILE missing — cp .env.prod.example .env.prod && edit secrets (once only)" >&2
   exit 1
 fi
+# Never auto-overwrite $ENV_FILE from .env.prod.example — git pull must not wipe secrets.
 
 if [[ ! -f keys/jwt_private.pem || ! -f keys/jwt_public.pem ]]; then
   echo "==> generating JWT keys"

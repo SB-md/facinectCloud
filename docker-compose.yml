@@ -1,6 +1,6 @@
 services:
   gateway:
-    image: traefik:v3.2
+    image: traefik:v3.7.13
     container_name: facinect-gateway
     ports:
       - "8080:80"
