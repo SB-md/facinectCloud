@@ -33,6 +33,25 @@
   font-size: 0.95rem;
 }
 
+.specPicker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+  font-size: 0.9rem;
+  color: #3d564e;
+}
+
+.specPicker select {
+  min-width: 180px;
+  padding: 8px 12px;
+  border: 1px solid #b7c9c1;
+  border-radius: 8px;
+  background: #fff;
+  color: #16352c;
+  font: inherit;
+}
+
 .swagger {
   max-width: 1200px;
   margin: 0 auto;

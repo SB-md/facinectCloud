@@ -1,0 +1,187 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Facinect Notifications API",
+    "description": "WhatsApp + push notification service for Facinect features.",
+    "version": "0.1.0"
+  },
+  "servers": [
+    { "url": "http://localhost:8080", "description": "Local Traefik gateway" }
+  ],
+  "tags": [
+    { "name": "health" },
+    { "name": "send" },
+    { "name": "devices" }
+  ],
+  "components": {
+    "securitySchemes": {
+      "serviceKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Service-Key"
+      }
+    }
+  },
+  "paths": {
+    "/v1/notifications/health": {
+      "get": {
+        "tags": ["health"],
+        "summary": "Health check",
+        "responses": {
+          "200": { "description": "OK" },
+          "503": { "description": "Degraded" }
+        }
+      }
+    },
+    "/v1/notifications/openapi.json": {
+      "get": {
+        "tags": ["health"],
+        "summary": "OpenAPI document",
+        "responses": { "200": { "description": "OpenAPI 3 JSON" } }
+      }
+    },
+    "/v1/notifications/send": {
+      "post": {
+        "tags": ["send"],
+        "summary": "Send one notification",
+        "security": [{ "serviceKey": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "channel": { "type": "string", "enum": ["whatsapp", "push", "both"] },
+                  "facility_id": { "type": "integer" },
+                  "template": { "type": "string" },
+                  "to": {
+                    "type": "object",
+                    "properties": {
+                      "whatsapp": { "type": "string" },
+                      "user_id": { "type": "integer" },
+                      "device_tokens": { "type": "array", "items": { "type": "string" } }
+                    }
+                  },
+                  "data": { "type": "object" }
+                }
+              },
+              "example": {
+                "channel": "whatsapp",
+                "facility_id": 20,
+                "template": "hello_world",
+                "to": { "whatsapp": "919876543210" },
+                "data": { "name": "Ravi" }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Job created/processed" },
+          "400": { "description": "Bad request" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/v1/notifications/send-bulk": {
+      "post": {
+        "tags": ["send"],
+        "summary": "Send bulk notifications (max 200)",
+        "security": [{ "serviceKey": [] }],
+        "responses": {
+          "200": { "description": "Jobs created" },
+          "400": { "description": "Bad request" }
+        }
+      }
+    },
+    "/v1/notifications/{id}": {
+      "get": {
+        "tags": ["send"],
+        "summary": "Get notification job",
+        "security": [{ "serviceKey": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "Job" },
+          "404": { "description": "Not found" }
+        }
+      }
+    },
+    "/v1/notifications/facilities/{facilityId}/whatsapp": {
+      "get": {
+        "tags": ["facility"],
+        "summary": "Get facility WhatsApp config (token masked)",
+        "security": [{ "serviceKey": [] }],
+        "parameters": [
+          { "name": "facilityId", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": { "200": { "description": "Config with token_from / phone_from" } }
+      },
+      "put": {
+        "tags": ["facility"],
+        "summary": "Upsert facility WhatsApp config (PHP hybrid)",
+        "security": [{ "serviceKey": [] }],
+        "parameters": [
+          { "name": "facilityId", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "meta_phone_number_id": { "type": "string" },
+                  "whatsapp_api_token": { "type": "string", "description": "Omit to keep; empty string clears to env" },
+                  "waba_id": { "type": "string" },
+                  "whatsapp_enabled": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Updated config" } }
+      }
+    },
+    "/v1/notifications/whatsapp/lookup": {
+      "get": {
+        "tags": ["facility"],
+        "summary": "Find facility by Meta phone_number_id (webhooks)",
+        "security": [{ "serviceKey": [] }],
+        "parameters": [
+          { "name": "phone_number_id", "in": "query", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "facility_id" },
+          "404": { "description": "Not found" }
+        }
+      }
+    },
+    "/v1/notifications/devices": {
+      "post": {
+        "tags": ["devices"],
+        "summary": "Register device push token",
+        "security": [{ "serviceKey": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["user_id", "token"],
+                "properties": {
+                  "user_id": { "type": "integer" },
+                  "token": { "type": "string" },
+                  "platform": { "type": "string", "enum": ["android", "ios", "web"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Registered" }
+        }
+      }
+    }
+  }
+}

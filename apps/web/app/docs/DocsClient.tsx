@@ -1,0 +1,119 @@
+'use client';
+
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import styles from './docs.module.css';
+
+declare global {
+  interface Window {
+    SwaggerUIBundle?: (opts: Record<string, unknown>) => unknown;
+  }
+}
+
+const SPECS = [
+  {
+    id: 'identity',
+    label: 'Identity',
+    url: '/v1/auth/openapi.json',
+    blurb: 'Auth, session, Google OAuth, password — /v1/auth',
+  },
+  {
+    id: 'notifications',
+    label: 'Notifications',
+    url: '/v1/notifications/openapi.json',
+    blurb: 'WhatsApp + push send, facility config — /v1/notifications',
+  },
+] as const;
+
+type SpecId = (typeof SPECS)[number]['id'];
+
+function resolveSpecId(raw: string | null): SpecId {
+  if (raw === 'notifications') return 'notifications';
+  return 'identity';
+}
+
+export default function DocsClient() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const specId = resolveSpecId(searchParams.get('spec'));
+  const spec = useMemo(() => SPECS.find((s) => s.id === specId) || SPECS[0], [specId]);
+  const [ready, setReady] = useState(false);
+
+  const mountSwagger = useCallback((url: string) => {
+    const el = document.getElementById('swagger-ui');
+    if (el) el.innerHTML = '';
+    if (!window.SwaggerUIBundle) return;
+    window.SwaggerUIBundle({
+      url,
+      dom_id: '#swagger-ui',
+      deepLinking: true,
+      persistAuthorization: true,
+      displayRequestDuration: true,
+      tryItOutEnabled: true,
+    });
+  }, []);
+
+  useEffect(() => {
+    const cssId = 'swagger-ui-css';
+    if (!document.getElementById(cssId)) {
+      const link = document.createElement('link');
+      link.id = cssId;
+      link.rel = 'stylesheet';
+      link.href = 'https://unpkg.com/swagger-ui-dist@5.17.14/swagger-ui.css';
+      document.head.appendChild(link);
+    }
+
+    const existing = document.getElementById('swagger-ui-bundle') as HTMLScriptElement | null;
+    if (existing && window.SwaggerUIBundle) {
+      setReady(true);
+      return;
+    }
+    if (existing) {
+      existing.addEventListener('load', () => setReady(true));
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.id = 'swagger-ui-bundle';
+    script.src = 'https://unpkg.com/swagger-ui-dist@5.17.14/swagger-ui-bundle.js';
+    script.async = true;
+    script.onload = () => setReady(true);
+    document.body.appendChild(script);
+  }, []);
+
+  useEffect(() => {
+    if (!ready) return;
+    mountSwagger(spec.url);
+  }, [ready, spec.url, mountSwagger]);
+
+  function onSpecChange(next: string) {
+    const id = resolveSpecId(next);
+    const q = new URLSearchParams(searchParams.toString());
+    q.set('spec', id);
+    router.replace(`${pathname}?${q.toString()}`);
+  }
+
+  return (
+    <main className={styles.wrap}>
+      <header className={styles.header}>
+        <a href="/" className={styles.brand}>
+          Facinect
+        </a>
+        <h1>API docs</h1>
+        <p>{spec.blurb}</p>
+        <label className={styles.specPicker}>
+          <span>Service</span>
+          <select value={spec.id} onChange={(e) => onSpecChange(e.target.value)}>
+            {SPECS.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      </header>
+      <div id="swagger-ui" className={styles.swagger} />
+    </main>
+  );
+}
