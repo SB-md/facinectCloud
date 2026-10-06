@@ -120,6 +120,50 @@ services:
       - facinect_internal
     restart: unless-stopped
 
+  notifications:
+    build:
+      context: ./services/notifications
+      dockerfile: Dockerfile
+    container_name: facinect-notifications
+    environment:
+      APP_ENV: local
+      HTTP_ADDR: ":8080"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: ${POSTGRES_IDENTITY_DB}
+      DB_USER: ${POSTGRES_IDENTITY_USER}
+      DB_PASSWORD: ${POSTGRES_IDENTITY_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      NOTIFICATIONS_SERVICE_KEY: ${NOTIFICATIONS_SERVICE_KEY:-}
+      NOTIFICATIONS_DRY_RUN: ${NOTIFICATIONS_DRY_RUN:-true}
+      META_WHATSAPP_TOKEN: ${META_WHATSAPP_TOKEN:-}
+      META_PHONE_NUMBER_ID: ${META_PHONE_NUMBER_ID:-}
+      META_API_VERSION: ${META_API_VERSION:-v21.0}
+      FCM_SERVER_KEY: ${FCM_SERVER_KEY:-}
+      CORS_ORIGINS: "*"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/v1/notifications/health | grep -q '\"status\":\"ok\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=facinect_internal
+      - traefik.http.routers.notifications.rule=PathPrefix(`/v1/notifications`)
+      - traefik.http.routers.notifications.entrypoints=web
+      - traefik.http.routers.notifications.priority=20
+      - traefik.http.services.notifications.loadbalancer.server.port=8080
+    networks:
+      - facinect_internal
+    restart: unless-stopped
+
   web:
     build:
       context: ./apps/web

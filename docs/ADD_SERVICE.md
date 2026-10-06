@@ -14,6 +14,6 @@
 | Order | Service | Prefix |
 |-------|---------|--------|
 | 1 | identity | `/v1/auth` (done) |
-| 2 | saas-billing | `/v1/saas` |
-| 3 | whatsapp | `/v1/wa` |
+| 2 | notifications | `/v1/notifications` (done — WhatsApp + push) |
+| 3 | saas-billing | `/v1/saas` |
 | 4 | booking | `/v1/booking` |

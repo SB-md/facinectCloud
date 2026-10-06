@@ -96,6 +96,8 @@ Later (domain + HTTPS): put nginx/Caddy in front of `:8081` or add Traefik Let's
 |--------|------|-------------|
 | GET | `/v1/auth/health` | Health (`runtime: go`) |
 | GET | `/v1/auth/openapi.json` | OpenAPI 3 spec |
+| GET | `/v1/notifications/health` | Notifications health |
+| POST | `/v1/notifications/send` | Send WhatsApp/push (dry-run local) |
 | GET | `/docs` | Swagger UI |
 | GET | `/api/health` | Web health |
 | POST | `/v1/auth/check-email` | Email exists? |

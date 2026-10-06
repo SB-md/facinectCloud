@@ -1,0 +1,13 @@
+---
+description: Feature-wise branch + PR shipping for all Facinect services
+alwaysApply: true
+---
+
+# Feature shipping
+
+When the user asks to ship a feature, create a PR, push service changes, or do feature-wise code push:
+
+1. Follow project skill `.cursor/skills/feature-pr/SKILL.md`.
+2. Applies to **all** services/apps (`services/*`, `apps/*`, gateway, docs, compose) — not one service only.
+3. Branch `feat/<service>-<slug>`; create if missing; push; `gh pr create`; return PR URL.
+4. Never commit `.env` or secrets; never force-push main.
