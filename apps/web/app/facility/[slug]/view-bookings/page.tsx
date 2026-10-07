@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
 import FacilityShell from '../FacilityShell';
 import { FacilityMembership, fetchSession, findFacilityBySlug, getCachedUser } from '../../../../lib/auth';
@@ -33,6 +34,7 @@ function ViewBookingsBody() {
   const search = useSearchParams();
   const initialMonth = search.get('month');
   const initialStatus = search.get('status');
+  const fromDashboard = search.get('from') === 'dashboard';
 
   const [facility, setFacility] = useState<FacilityMembership | null>(null);
   const [mode, setMode] = useState<'date' | 'month'>(initialMonth ? 'month' : 'date');
@@ -128,9 +130,19 @@ function ViewBookingsBody() {
 
   const confirmed = rows.filter((r) => r.status === 'confirmed').length;
   const cancelled = rows.filter((r) => r.status === 'cancelled').length;
+  const dashHref = `/facility/${encodeURIComponent(params.slug)}${
+    initialMonth ? `?month=${encodeURIComponent(initialMonth)}` : ''
+  }`;
 
   return (
     <>
+      <div className={styles.backBar}>
+        <Link href={dashHref} className={styles.backLink}>
+          <i className="fa-solid fa-arrow-left" />
+          {fromDashboard || initialMonth ? 'Back to dashboard' : 'Dashboard'}
+        </Link>
+      </div>
+
       <div className={styles.detailGrid}>
         <div className={styles.detailCard}>
           <span>Rows</span>

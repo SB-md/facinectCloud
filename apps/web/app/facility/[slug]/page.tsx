@@ -18,10 +18,10 @@ export default function FacilityDashboardPage() {
   return (
     <FacilityShell
       pageKey="dashboard"
-      title="Dashboard"
-      description="Facility overview — bookings this month (Facinect-style)."
+      title="Overview"
+      description="This month at a glance."
     >
-      <Suspense fallback={<p>Loading dashboard…</p>}>
+      <Suspense fallback={<p className={styles.dashHint}>Loading overview…</p>}>
         <DashboardBody />
       </Suspense>
     </FacilityShell>
@@ -44,18 +44,15 @@ function DashboardBody() {
   const facilityId = facility?.facilityId;
   const slug = params.slug;
 
-  const load = useCallback(
-    async (fid: number, monthKey: string) => {
-      const [y, m] = monthKey.split('-').map(Number);
-      const [c, x] = await Promise.all([
-        listBookings(fid, { year: y, month: m, status: 'confirmed' }),
-        listBookings(fid, { year: y, month: m, status: 'cancelled' }),
-      ]);
-      setConfirmed(c.bookings || []);
-      setCancelled(x.bookings || []);
-    },
-    [],
-  );
+  const load = useCallback(async (fid: number, monthKey: string) => {
+    const [y, m] = monthKey.split('-').map(Number);
+    const [c, x] = await Promise.all([
+      listBookings(fid, { year: y, month: m, status: 'confirmed' }),
+      listBookings(fid, { year: y, month: m, status: 'cancelled' }),
+    ]);
+    setConfirmed(c.bookings || []);
+    setCancelled(x.bookings || []);
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -93,12 +90,11 @@ function DashboardBody() {
   }, [month]);
 
   function goMonth(delta: number) {
-    const next = shiftMonth(month, delta);
-    router.replace(`/facility/${encodeURIComponent(slug)}?month=${next}`);
+    router.replace(`/facility/${encodeURIComponent(slug)}?month=${shiftMonth(month, delta)}`);
   }
 
   if (!loaded) {
-    return <p>Loading dashboard…</p>;
+    return <p className={styles.dashHint}>Loading overview…</p>;
   }
 
   if (!facilityId) {
@@ -106,93 +102,109 @@ function DashboardBody() {
   }
 
   const viewBase = `/facility/${encodeURIComponent(slug)}/view-bookings`;
+  const fromDash = `from=dashboard&month=${month}`;
 
   return (
-    <>
-      <div className={styles.dashNav}>
-        <button type="button" className={styles.navCircle} aria-label="Previous month" onClick={() => goMonth(-1)}>
-          <i className="fa-solid fa-chevron-left" />
-        </button>
-        <div className={styles.dashMonth}>{monthLabel}</div>
-        <button type="button" className={styles.navCircle} aria-label="Next month" onClick={() => goMonth(1)}>
-          <i className="fa-solid fa-chevron-right" />
-        </button>
-      </div>
+    <div className={styles.dash}>
+      <header className={styles.dashHero}>
+        <div className={styles.dashHeroCopy}>
+          <p className={styles.dashKicker}>Facility pulse</p>
+          <h2 className={styles.dashHeroTitle}>{facility?.facilityName || slug}</h2>
+        </div>
+        <div className={styles.dashMonthBar} role="group" aria-label="Select month">
+          <button type="button" className={styles.dashMonthBtn} aria-label="Previous month" onClick={() => goMonth(-1)}>
+            <i className="fa-solid fa-chevron-left" />
+          </button>
+          <div className={styles.dashMonthLabel}>
+            <span>{monthLabel}</span>
+            {busy ? <em>Updating…</em> : null}
+          </div>
+          <button type="button" className={styles.dashMonthBtn} aria-label="Next month" onClick={() => goMonth(1)}>
+            <i className="fa-solid fa-chevron-right" />
+          </button>
+        </div>
+      </header>
 
-      {busy && <p className={styles.dashHint}>Refreshing…</p>}
       {err && <p className={styles.settingsErr}>{err}</p>}
 
-      <div className={styles.statsGrid}>
-        <article className={`${styles.statCard} ${styles.statConfirmed}`}>
-          <div className={styles.statHeader}>
-            <span className={styles.statLabel}>Confirmed bookings</span>
-            <span className={`${styles.statBadge} ${styles.badgeOk}`}>{confPct}%</span>
+      <div className={styles.dashMetrics}>
+        <article className={`${styles.dashMetric} ${styles.dashMetricOk}`}>
+          <div className={styles.dashMetricTop}>
+            <span className={styles.dashMetricIcon} aria-hidden>
+              <i className="fa-solid fa-calendar-check" />
+            </span>
+            <span className={styles.dashMetricShare}>{confPct}%</span>
           </div>
-          <div className={styles.statValue}>{confSum.count}</div>
-          <Sparkline values={confSum.weekly} stroke="rgba(16, 185, 129, 1)" fill="rgba(16, 185, 129, 0.15)" />
-          <div className={styles.statFooter}>
-            <Link href={`${viewBase}?month=${month}&status=confirmed`} className={styles.statLink}>
-              View details <i className="fa-solid fa-arrow-right" />
-            </Link>
-          </div>
+          <p className={styles.dashMetricLabel}>Confirmed</p>
+          <p className={styles.dashMetricValue}>{confSum.count}</p>
+          <Sparkline
+            values={confSum.weekly}
+            stroke="var(--portal-teal)"
+            fill="rgba(21, 154, 127, 0.14)"
+          />
+          <Link href={`${viewBase}?${fromDash}&status=confirmed`} className={styles.dashMetricCta}>
+            View details
+            <i className="fa-solid fa-arrow-right" />
+          </Link>
         </article>
 
-        <article className={`${styles.statCard} ${styles.statCancelled}`}>
-          <div className={styles.statHeader}>
-            <span className={styles.statLabel}>Cancellations</span>
-            <span className={`${styles.statBadge} ${styles.badgeBad}`}>{canPct}%</span>
+        <article className={`${styles.dashMetric} ${styles.dashMetricBad}`}>
+          <div className={styles.dashMetricTop}>
+            <span className={styles.dashMetricIcon} aria-hidden>
+              <i className="fa-solid fa-calendar-xmark" />
+            </span>
+            <span className={styles.dashMetricShare}>{canPct}%</span>
           </div>
-          <div className={styles.statValue}>{canSum.count}</div>
-          <Sparkline values={canSum.weekly} stroke="rgba(239, 68, 68, 1)" fill="rgba(239, 68, 68, 0.12)" />
-          <div className={styles.statFooter}>
-            <Link href={`${viewBase}?month=${month}&status=cancelled`} className={styles.statLinkDanger}>
-              View details <i className="fa-solid fa-arrow-right" />
-            </Link>
-          </div>
-        </article>
-
-        <article className={`${styles.statCard} ${styles.statStudents}`}>
-          <div className={styles.statHeader}>
-            <span className={styles.statLabel}>Students</span>
-            <span className={`${styles.statBadge} ${styles.badgeWarn}`}>Soon</span>
-          </div>
-          <div className={styles.statValue}>—</div>
-          <div className={styles.statPlaceholder}>Students service not wired yet</div>
-          <div className={styles.statFooter}>
-            <Link href={`/facility/${encodeURIComponent(slug)}/students`} className={styles.statLinkWarn}>
-              Open students <i className="fa-solid fa-arrow-right" />
-            </Link>
-          </div>
-        </article>
-
-        <article className={`${styles.statCard} ${styles.statMembers}`}>
-          <div className={styles.statHeader}>
-            <span className={styles.statLabel}>Registered members</span>
-            <span className={`${styles.statBadge} ${styles.badgeInfo}`}>Soon</span>
-          </div>
-          <div className={styles.statValue}>—</div>
-          <div className={styles.statPlaceholder}>Members service not wired yet</div>
-          <div className={styles.statFooter}>
-            <Link href={`/facility/${encodeURIComponent(slug)}/members`} className={styles.statLinkInfo}>
-              Open members <i className="fa-solid fa-arrow-right" />
-            </Link>
-          </div>
+          <p className={styles.dashMetricLabel}>Cancelled</p>
+          <p className={styles.dashMetricValue}>{canSum.count}</p>
+          <Sparkline
+            values={canSum.weekly}
+            stroke="#c45c5c"
+            fill="rgba(196, 92, 92, 0.12)"
+          />
+          <Link href={`${viewBase}?${fromDash}&status=cancelled`} className={styles.dashMetricCta}>
+            View details
+            <i className="fa-solid fa-arrow-right" />
+          </Link>
         </article>
       </div>
 
-      <section className={styles.panel} style={{ marginTop: 18 }}>
-        <h2>Quick links</h2>
-        <p style={{ marginBottom: 12 }}>Same flows as Facinect admin home.</p>
-        <div className={styles.actionRow}>
-          <Link href={`/facility/${encodeURIComponent(slug)}/slots-setup`} className={styles.settingsPrimary}>
-            Slots setup
+      <div className={styles.dashSecondary}>
+        <article className={styles.dashSoft}>
+          <div className={styles.dashSoftHead}>
+            <i className="fa-solid fa-user-graduate" />
+            <span>Students</span>
+          </div>
+          <p className={styles.dashSoftValue}>—</p>
+          <p className={styles.dashSoftNote}>Coming soon</p>
+          <Link href={`/facility/${encodeURIComponent(slug)}/students`} className={styles.dashSoftLink}>
+            Open
           </Link>
-          <Link href={`${viewBase}?month=${month}`} className={styles.settingsPrimary}>
-            View bookings
+        </article>
+        <article className={styles.dashSoft}>
+          <div className={styles.dashSoftHead}>
+            <i className="fa-solid fa-users" />
+            <span>Members</span>
+          </div>
+          <p className={styles.dashSoftValue}>—</p>
+          <p className={styles.dashSoftNote}>Coming soon</p>
+          <Link href={`/facility/${encodeURIComponent(slug)}/members`} className={styles.dashSoftLink}>
+            Open
           </Link>
-        </div>
-      </section>
-    </>
+        </article>
+        <article className={styles.dashSoft}>
+          <div className={styles.dashSoftHead}>
+            <i className="fa-solid fa-table-cells" />
+            <span>Slots</span>
+          </div>
+          <p className={styles.dashSoftValue}>Setup</p>
+          <p className={styles.dashSoftNote}>Courts & availability</p>
+          <Link href={`/facility/${encodeURIComponent(slug)}/slots-setup`} className={styles.dashSoftLink}>
+            Open
+          </Link>
+        </article>
+      </div>
+    </div>
   );
 }
 
@@ -205,9 +217,9 @@ function Sparkline({
   stroke: string;
   fill: string;
 }) {
-  const w = 220;
-  const h = 72;
-  const pad = 6;
+  const w = 240;
+  const h = 56;
+  const pad = 4;
   const max = Math.max(1, ...values);
   const step = (w - pad * 2) / Math.max(1, values.length - 1);
   const points = values.map((v, i) => {
@@ -219,9 +231,16 @@ function Sparkline({
   const area = `${pad},${h - pad} ${line} ${w - pad},${h - pad}`;
 
   return (
-    <svg className={styles.sparkline} viewBox={`0 0 ${w} ${h}`} role="img" aria-label="Weekly trend">
+    <svg className={styles.dashSpark} viewBox={`0 0 ${w} ${h}`} role="img" aria-label="Weekly trend">
       <polygon points={area} fill={fill} />
-      <polyline points={line} fill="none" stroke={stroke} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+      <polyline
+        points={line}
+        fill="none"
+        stroke={stroke}
+        strokeWidth="2.25"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }

@@ -700,186 +700,334 @@
 }
 
 
-/* —— Facility dashboard (Facinect-style) —— */
+/* —— Back navigation —— */
 
-.dashNav {
-  display: flex;
+.backBar {
+  margin: -4px 0 16px;
+}
+
+.backLink {
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  gap: 16px;
-  margin-bottom: 18px;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--portal-teal-deep);
+  text-decoration: none;
+  padding: 8px 12px 8px 10px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  transition: background 0.15s ease, border-color 0.15s ease;
 }
 
-.dashMonth {
-  min-width: 180px;
-  text-align: center;
-  font-size: 1.15rem;
+.backLink:hover {
+  background: rgba(21, 154, 127, 0.08);
+  border-color: rgba(21, 154, 127, 0.18);
+}
+
+.backLink i {
+  font-size: 12px;
+}
+
+/* —— Facility dashboard (signature theme) —— */
+
+.dash {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.dashHint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--portal-muted);
+}
+
+.dashHero {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+  padding: 22px 24px;
+  border-radius: 20px;
+  background:
+    linear-gradient(135deg, rgba(21, 154, 127, 0.14) 0%, rgba(0, 174, 239, 0.08) 48%, rgba(140, 198, 63, 0.1) 100%),
+    #fff;
+  border: 1px solid rgba(21, 154, 127, 0.14);
+  position: relative;
+  overflow: hidden;
+}
+
+.dashHero::after {
+  content: '';
+  position: absolute;
+  inset: auto -20% -40% 40%;
+  height: 140%;
+  background: radial-gradient(circle, rgba(0, 174, 239, 0.12), transparent 60%);
+  pointer-events: none;
+}
+
+.dashHeroCopy {
+  position: relative;
+  z-index: 1;
+}
+
+.dashKicker {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--portal-teal-deep);
+}
+
+.dashHeroTitle {
+  margin: 0;
+  font-size: clamp(1.35rem, 2.4vw, 1.75rem);
   font-weight: 700;
+  letter-spacing: -0.03em;
   color: var(--portal-ink);
-  letter-spacing: -0.02em;
+  line-height: 1.2;
 }
 
-.navCircle {
-  width: 40px;
-  height: 40px;
+.dashMonthBar {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(15, 31, 26, 0.08);
+  box-shadow: 0 1px 2px rgba(11, 42, 36, 0.04);
+}
+
+.dashMonthBtn {
+  width: 36px;
+  height: 36px;
+  border: none;
   border-radius: 50%;
-  border: 1px solid var(--portal-line);
-  background: #fff;
-  color: var(--portal-ink);
+  background: transparent;
+  color: var(--portal-teal-deep);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: background 0.15s ease;
 }
 
-.navCircle:hover {
-  background: #f0faf6;
-  border-color: var(--portal-teal);
-  color: var(--portal-teal);
+.dashMonthBtn:hover {
+  background: rgba(21, 154, 127, 0.12);
 }
 
-.dashHint {
+.dashMonthLabel {
+  min-width: 148px;
   text-align: center;
-  font-size: 13px;
-  color: var(--portal-muted);
-  margin: 0 0 12px;
+  padding: 0 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
 }
 
-.statsGrid {
+.dashMonthLabel span {
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--portal-ink);
+}
+
+.dashMonthLabel em {
+  font-style: normal;
+  font-size: 10px;
+  color: var(--portal-muted);
+}
+
+.dashMetrics {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
 }
 
-.statCard {
-  background: #fff;
-  border: 1px solid var(--portal-line);
-  border-radius: 16px;
-  padding: 18px 18px 14px;
+.dashMetric {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  min-height: 210px;
-  box-shadow: 0 1px 2px rgba(7, 20, 16, 0.04);
+  gap: 6px;
+  padding: 22px 22px 18px;
+  border-radius: 18px;
+  background: #fff;
+  border: 1px solid var(--portal-line);
+  min-height: 240px;
+  transition: border-color 0.2s ease, transform 0.2s ease;
 }
 
-.statHeader {
+.dashMetric:hover {
+  border-color: rgba(21, 154, 127, 0.28);
+  transform: translateY(-1px);
+}
+
+.dashMetricOk {
+  background:
+    linear-gradient(180deg, rgba(21, 154, 127, 0.06) 0%, #fff 42%),
+    #fff;
+}
+
+.dashMetricBad {
+  background:
+    linear-gradient(180deg, rgba(196, 92, 92, 0.05) 0%, #fff 42%),
+    #fff;
+}
+
+.dashMetricTop {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  margin-bottom: 4px;
 }
 
-.statLabel {
+.dashMetricIcon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+}
+
+.dashMetricOk .dashMetricIcon {
+  background: rgba(21, 154, 127, 0.12);
+  color: var(--portal-teal-deep);
+}
+
+.dashMetricBad .dashMetricIcon {
+  background: rgba(196, 92, 92, 0.1);
+  color: #a84848;
+}
+
+.dashMetricShare {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--portal-muted);
+  letter-spacing: 0.02em;
+}
+
+.dashMetricLabel {
+  margin: 0;
   font-size: 13px;
   font-weight: 600;
   color: var(--portal-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
 }
 
-.statBadge {
-  font-size: 11px;
-  font-weight: 700;
-  padding: 3px 8px;
-  border-radius: 999px;
-}
-
-.badgeOk {
-  background: rgba(16, 185, 129, 0.12);
-  color: #059669;
-}
-
-.badgeBad {
-  background: rgba(239, 68, 68, 0.12);
-  color: #dc2626;
-}
-
-.badgeWarn {
-  background: rgba(245, 158, 11, 0.14);
-  color: #b45309;
-}
-
-.badgeInfo {
-  background: rgba(59, 130, 246, 0.12);
-  color: #2563eb;
-}
-
-.statValue {
-  font-size: 2.4rem;
-  font-weight: 800;
+.dashMetricValue {
+  margin: 0;
+  font-size: clamp(2.4rem, 4vw, 3.1rem);
+  font-weight: 750;
   line-height: 1;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.04em;
   color: var(--portal-ink);
 }
 
-.statConfirmed .statValue {
-  color: #059669;
+.dashMetricOk .dashMetricValue {
+  color: var(--portal-teal-deep);
 }
 
-.statCancelled .statValue {
-  color: #dc2626;
+.dashMetricBad .dashMetricValue {
+  color: #9a4444;
 }
 
-.statStudents .statValue,
-.statMembers .statValue {
-  color: var(--portal-muted);
-}
-
-.sparkline {
+.dashSpark {
   width: 100%;
-  height: 72px;
-  margin-top: 4px;
+  height: 56px;
+  margin: 8px 0 4px;
 }
 
-.statPlaceholder {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  font-size: 13px;
-  color: var(--portal-muted);
-  min-height: 72px;
-}
-
-.statFooter {
+.dashMetricCta {
   margin-top: auto;
-  padding-top: 8px;
+  padding-top: 12px;
   border-top: 1px solid var(--portal-line);
-}
-
-.statLink,
-.statLinkDanger,
-.statLinkWarn,
-.statLinkInfo {
-  font-size: 13px;
-  font-weight: 600;
-  text-decoration: none;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--portal-teal-deep);
+  text-decoration: none;
 }
 
-.statLink {
-  color: #059669;
+.dashMetricBad .dashMetricCta {
+  color: #9a4444;
 }
 
-.statLinkDanger {
-  color: #dc2626;
+.dashMetricCta i {
+  font-size: 11px;
+  transition: transform 0.15s ease;
 }
 
-.statLinkWarn {
-  color: #b45309;
+.dashMetricCta:hover i {
+  transform: translateX(3px);
 }
 
-.statLinkInfo {
-  color: #2563eb;
+.dashSecondary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
 }
 
-.statLink:hover,
-.statLinkDanger:hover,
-.statLinkWarn:hover,
-.statLinkInfo:hover {
+.dashSoft {
+  padding: 18px 18px 16px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--portal-line);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 132px;
+}
+
+.dashSoftHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--portal-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 4px;
+}
+
+.dashSoftHead i {
+  color: var(--portal-teal);
+  font-size: 13px;
+}
+
+.dashSoftValue {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--portal-ink);
+}
+
+.dashSoftNote {
+  margin: 0;
+  font-size: 12px;
+  color: var(--portal-muted);
+  flex: 1;
+}
+
+.dashSoftLink {
+  margin-top: 8px;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--portal-teal-deep);
+  text-decoration: none;
+}
+
+.dashSoftLink:hover {
   text-decoration: underline;
 }
 
@@ -897,7 +1045,12 @@
     height: 44px;
   }
 
-  .statsGrid {
+  .dashMetrics,
+  .dashSecondary {
     grid-template-columns: 1fr;
+  }
+
+  .dashHero {
+    padding: 18px;
   }
 }
