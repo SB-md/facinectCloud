@@ -66,6 +66,12 @@ const SPECS = [
     blurb: 'Facility profile, sports, staff, payments — /v1/administration',
   },
   {
+    id: 'add-facility',
+    label: 'Add facility',
+    url: '/v1/add-facility/openapi.json',
+    blurb: 'Onboard / additional facility requests — /v1/add-facility',
+  },
+  {
     id: 'ai',
     label: 'AI',
     url: '/v1/ai/openapi.json',
@@ -84,6 +90,7 @@ function resolveSpecId(raw: string | null): SpecId {
   if (raw === 'enquiry') return 'enquiry';
   if (raw === 'offers') return 'offers';
   if (raw === 'administration') return 'administration';
+  if (raw === 'add-facility' || raw === 'addfacility') return 'add-facility';
   if (raw === 'ai') return 'ai';
   return 'identity';
 }
