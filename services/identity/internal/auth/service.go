@@ -527,13 +527,24 @@ func (s *Service) findOrCreateByPhone(phone string) (*User, error) {
 	return s.UserByID(id)
 }
 
-func (s *Service) SetPassword(userID int64, newPassword string) error {
+func (s *Service) SetPassword(userID int64, currentPassword, newPassword string) error {
 	newPassword = strings.TrimSpace(newPassword)
 	if len(newPassword) < 8 {
 		return fmt.Errorf("password_too_short")
 	}
-	if _, err := s.UserByID(userID); err != nil {
+	user, err := s.UserByID(userID)
+	if err != nil {
 		return ErrUnauthorized
+	}
+	// Existing password accounts must prove current password; first-time set (OAuth-only) may omit it.
+	if user.PasswordHash.Valid && user.PasswordHash.String != "" {
+		currentPassword = strings.TrimSpace(currentPassword)
+		if currentPassword == "" {
+			return fmt.Errorf("current_password_required")
+		}
+		if bcrypt.CompareHashAndPassword([]byte(user.PasswordHash.String), []byte(currentPassword)) != nil {
+			return fmt.Errorf("invalid_current_password")
+		}
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
 	if err != nil {

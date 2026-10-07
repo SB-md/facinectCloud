@@ -30,8 +30,8 @@ const AUTH_ERRORS: Record<string, string> = {
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState('admin@facinect.local');
-  const [password, setPassword] = useState('ChangeMe_Admin_123!');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [msg, setMsg] = useState('');
   const [msgType, setMsgType] = useState<'ok' | 'error' | ''>('');
