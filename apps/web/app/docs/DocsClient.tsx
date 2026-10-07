@@ -23,12 +23,19 @@ const SPECS = [
     url: '/v1/notifications/openapi.json',
     blurb: 'WhatsApp + push send, facility config — /v1/notifications',
   },
+  {
+    id: 'booking',
+    label: 'Booking',
+    url: '/v1/booking/openapi.json',
+    blurb: 'Courts, slots, view/book/block — /v1/booking',
+  },
 ] as const;
 
 type SpecId = (typeof SPECS)[number]['id'];
 
 function resolveSpecId(raw: string | null): SpecId {
   if (raw === 'notifications') return 'notifications';
+  if (raw === 'booking') return 'booking';
   return 'identity';
 }
 

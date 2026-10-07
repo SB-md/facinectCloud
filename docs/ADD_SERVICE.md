@@ -15,5 +15,5 @@
 |-------|---------|--------|
 | 1 | identity | `/v1/auth` (done) |
 | 2 | notifications | `/v1/notifications` (done — WhatsApp + push) |
-| 3 | saas-billing | `/v1/saas` |
-| 4 | booking | `/v1/booking` |
+| 3 | booking | `/v1/booking` (done — view + book + slot block) |
+| 4 | saas-billing | `/v1/saas` |

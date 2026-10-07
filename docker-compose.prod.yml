@@ -162,6 +162,51 @@ services:
       - facinect_internal
     restart: unless-stopped
 
+  booking:
+    build:
+      context: ./services/booking
+      dockerfile: Dockerfile
+    container_name: facinect-booking
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      HTTP_ADDR: ":8080"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: ${POSTGRES_IDENTITY_DB}
+      DB_USER: ${POSTGRES_IDENTITY_USER}
+      DB_PASSWORD: ${POSTGRES_IDENTITY_PASSWORD}
+      BOOKING_SERVICE_KEY: ${BOOKING_SERVICE_KEY:-}
+      JWT_PUBLIC_KEY_PATH: /keys/jwt_public.pem
+      JWT_ISSUER: ${JWT_ISSUER}
+      JWT_AUDIENCE: ${JWT_AUDIENCE}
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://cloud.facinect.com}
+      BOOKING_OPEN_HOUR: ${BOOKING_OPEN_HOUR:-6}
+      BOOKING_CLOSE_HOUR: ${BOOKING_CLOSE_HOUR:-22}
+      BOOKING_SLOT_MINUTES: ${BOOKING_SLOT_MINUTES:-60}
+    volumes:
+      - ./keys:/keys:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      identity:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/v1/booking/health | grep -q '\"status\":\"ok\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=facinect_internal
+      - traefik.http.routers.booking.rule=PathPrefix(`/v1/booking`)
+      - traefik.http.routers.booking.entrypoints=web
+      - traefik.http.routers.booking.priority=20
+      - traefik.http.services.booking.loadbalancer.server.port=8080
+    networks:
+      - facinect_internal
+    restart: unless-stopped
+
   web:
     build:
       context: ./apps/web

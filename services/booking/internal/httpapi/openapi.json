@@ -1,0 +1,188 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Facinect Booking API",
+    "description": "Courts, slots (generate/block), and bookings (view/create/cancel) in one service.",
+    "version": "0.1.0"
+  },
+  "servers": [
+    { "url": "http://localhost:8080", "description": "Local Traefik gateway" },
+    { "url": "https://cloud.facinect.com", "description": "Production" }
+  ],
+  "tags": [
+    { "name": "health" },
+    { "name": "courts" },
+    { "name": "slots" },
+    { "name": "bookings" }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" },
+      "serviceKey": { "type": "apiKey", "in": "header", "name": "X-Service-Key" }
+    }
+  },
+  "security": [{ "bearerAuth": [] }, { "serviceKey": [] }],
+  "paths": {
+    "/v1/booking/health": {
+      "get": {
+        "tags": ["health"],
+        "security": [],
+        "summary": "Health check",
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/v1/booking/openapi.json": {
+      "get": {
+        "tags": ["health"],
+        "security": [],
+        "summary": "OpenAPI document",
+        "responses": { "200": { "description": "Spec" } }
+      }
+    },
+    "/v1/booking/facilities/{facilityId}/courts": {
+      "get": {
+        "tags": ["courts"],
+        "summary": "List courts",
+        "parameters": [{ "name": "facilityId", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "responses": { "200": { "description": "Courts" } }
+      },
+      "post": {
+        "tags": ["courts"],
+        "summary": "Create court",
+        "parameters": [{ "name": "facilityId", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name"],
+                "properties": {
+                  "name": { "type": "string" },
+                  "sport_id": { "type": "integer" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Created" } }
+      }
+    },
+    "/v1/booking/facilities/{facilityId}/slots": {
+      "get": {
+        "tags": ["slots"],
+        "summary": "List slots for a date (view availability)",
+        "parameters": [
+          { "name": "facilityId", "in": "path", "required": true, "schema": { "type": "integer" } },
+          { "name": "date", "in": "query", "required": true, "schema": { "type": "string", "format": "date" } },
+          { "name": "court_id", "in": "query", "schema": { "type": "integer" } }
+        ],
+        "responses": { "200": { "description": "Slots" } }
+      }
+    },
+    "/v1/booking/facilities/{facilityId}/slots/generate": {
+      "post": {
+        "tags": ["slots"],
+        "summary": "Generate day slots for courts",
+        "parameters": [{ "name": "facilityId", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["date"],
+                "properties": {
+                  "date": { "type": "string", "format": "date" },
+                  "court_id": { "type": "integer" },
+                  "open_hour": { "type": "integer" },
+                  "close_hour": { "type": "integer" },
+                  "slot_minutes": { "type": "integer" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Created count" } }
+      }
+    },
+    "/v1/booking/slots/{slotId}/block": {
+      "post": {
+        "tags": ["slots"],
+        "summary": "Block an available slot",
+        "parameters": [{ "name": "slotId", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "type": "object", "properties": { "notes": { "type": "string" } } }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Blocked" } }
+      }
+    },
+    "/v1/booking/slots/{slotId}/unblock": {
+      "post": {
+        "tags": ["slots"],
+        "summary": "Unblock a blocked slot",
+        "parameters": [{ "name": "slotId", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "responses": { "200": { "description": "Available" } }
+      }
+    },
+    "/v1/booking/facilities/{facilityId}/bookings": {
+      "get": {
+        "tags": ["bookings"],
+        "summary": "View bookings (filter by date/status/month)",
+        "parameters": [
+          { "name": "facilityId", "in": "path", "required": true, "schema": { "type": "integer" } },
+          { "name": "date", "in": "query", "schema": { "type": "string", "format": "date" } },
+          { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["confirmed", "cancelled"] } },
+          { "name": "year", "in": "query", "schema": { "type": "integer" } },
+          { "name": "month", "in": "query", "schema": { "type": "integer" } }
+        ],
+        "responses": { "200": { "description": "Bookings" } }
+      },
+      "post": {
+        "tags": ["bookings"],
+        "summary": "Create booking (locks available slot)",
+        "parameters": [{ "name": "facilityId", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["slot_id"],
+                "properties": {
+                  "slot_id": { "type": "integer" },
+                  "user_id": { "type": "integer" },
+                  "customer_name": { "type": "string" },
+                  "customer_phone": { "type": "string" },
+                  "customer_email": { "type": "string" },
+                  "notes": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Booking" } }
+      }
+    },
+    "/v1/booking/bookings/{bookingId}": {
+      "get": {
+        "tags": ["bookings"],
+        "summary": "Get booking by id",
+        "parameters": [{ "name": "bookingId", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "responses": { "200": { "description": "Booking" } }
+      }
+    },
+    "/v1/booking/bookings/{bookingId}/cancel": {
+      "post": {
+        "tags": ["bookings"],
+        "summary": "Cancel booking and free slot",
+        "parameters": [{ "name": "bookingId", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "responses": { "200": { "description": "Cancelled" } }
+      }
+    }
+  }
+}
