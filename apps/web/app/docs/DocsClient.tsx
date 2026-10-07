@@ -41,6 +41,12 @@ const SPECS = [
     url: '/v1/members/openapi.json',
     blurb: 'Register, list, membership status — /v1/members',
   },
+  {
+    id: 'tournaments',
+    label: 'Tournaments',
+    url: '/v1/tournaments/openapi.json',
+    blurb: 'List, create, update tournaments — /v1/tournaments',
+  },
 ] as const;
 
 type SpecId = (typeof SPECS)[number]['id'];
@@ -50,6 +56,7 @@ function resolveSpecId(raw: string | null): SpecId {
   if (raw === 'booking') return 'booking';
   if (raw === 'students') return 'students';
   if (raw === 'members') return 'members';
+  if (raw === 'tournaments') return 'tournaments';
   return 'identity';
 }
 
