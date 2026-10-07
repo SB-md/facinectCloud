@@ -9,6 +9,10 @@
     {
       "url": "http://localhost:8080",
       "description": "Local Traefik gateway"
+    },
+    {
+      "url": "https://cloud.facinect.com",
+      "description": "Production (cloud.facinect.com)"
     }
   ],
   "tags": [

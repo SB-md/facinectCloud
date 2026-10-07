@@ -8,12 +8,13 @@
 #   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
 #   ./scripts/migrate.sh
 #
-# Access (until domain/HTTPS reverse proxy):
-#   http://VPS_IP:8081/
+# Public URL (HTTPS via reverse proxy / DNS):
+#   https://cloud.facinect.com/
+# Traefik still listens on host :8081 for the proxy upstream.
 
 services:
   gateway:
-    image: traefik:v3.2
+    image: traefik:v3.7.13
     container_name: facinect-gateway
     ports:
       # Avoid RoutForge gateway on host :8080
