@@ -163,3 +163,33 @@ export function formatTimeRange(start?: string, end?: string): string {
   if (!s) return '—';
   return e ? `${s} – ${e}` : s;
 }
+
+/** YYYY-MM for the current calendar month (local). */
+export function monthKeyNow(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+/** Shift a YYYY-MM key by ±months. */
+export function shiftMonth(monthKey: string, delta: number): string {
+  const [y, m] = monthKey.split('-').map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+/**
+ * Facinect-style month summary: total count + 4 weekly buckets (days 1–7, 8–14, 15–21, 22–end).
+ * Buckets by slot_date when present, else created_at.
+ */
+export function summarizeMonthBookings(rows: BookingRow[]): { count: number; weekly: number[] } {
+  const weekly = [0, 0, 0, 0];
+  for (const b of rows) {
+    const raw = (b.slot_date || b.created_at || '').slice(0, 10);
+    if (!raw) continue;
+    const day = Number(raw.slice(8, 10));
+    if (!Number.isFinite(day) || day < 1) continue;
+    const idx = Math.min(3, Math.floor((day - 1) / 7));
+    weekly[idx] += 1;
+  }
+  return { count: rows.length, weekly };
+}

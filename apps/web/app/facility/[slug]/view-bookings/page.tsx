@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { Suspense, useCallback, useEffect, useState } from 'react';
+import { useParams, useSearchParams } from 'next/navigation';
 import FacilityShell from '../FacilityShell';
 import { FacilityMembership, fetchSession, findFacilityBySlug, getCachedUser } from '../../../../lib/auth';
 import {
@@ -9,6 +9,7 @@ import {
   cancelBooking,
   formatTimeRange,
   listBookings,
+  monthKeyNow,
   todayISO,
 } from '../../../../lib/booking';
 import styles from '../portal.module.css';
@@ -20,21 +21,29 @@ export default function ViewBookingsPage() {
       title="View Bookings"
       description="Confirmed and cancelled booking lists for this facility."
     >
-      <ViewBookingsBody />
+      <Suspense fallback={<p>Loading bookings…</p>}>
+        <ViewBookingsBody />
+      </Suspense>
     </FacilityShell>
   );
 }
 
 function ViewBookingsBody() {
   const params = useParams<{ slug: string }>();
+  const search = useSearchParams();
+  const initialMonth = search.get('month');
+  const initialStatus = search.get('status');
+
   const [facility, setFacility] = useState<FacilityMembership | null>(null);
-  const [mode, setMode] = useState<'date' | 'month'>('date');
+  const [mode, setMode] = useState<'date' | 'month'>(initialMonth ? 'month' : 'date');
   const [date, setDate] = useState(todayISO());
-  const [month, setMonth] = useState(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  const [month, setMonth] = useState(initialMonth || monthKeyNow());
+  const [status, setStatus] = useState<'all' | 'confirmed' | 'cancelled'>(() => {
+    if (initialStatus === 'cancelled' || initialStatus === 'confirmed' || initialStatus === 'all') {
+      return initialStatus;
+    }
+    return 'confirmed';
   });
-  const [status, setStatus] = useState<'all' | 'confirmed' | 'cancelled'>('confirmed');
   const [rows, setRows] = useState<BookingRow[]>([]);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
