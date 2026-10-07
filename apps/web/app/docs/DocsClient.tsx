@@ -54,6 +54,12 @@ const SPECS = [
     blurb: 'Inbox + AI analyze/notify — /v1/enquiry',
   },
   {
+    id: 'offers',
+    label: 'Offers',
+    url: '/v1/offers/openapi.json',
+    blurb: 'Promotions and discount coupons — /v1/offers',
+  },
+  {
     id: 'ai',
     label: 'AI',
     url: '/v1/ai/openapi.json',
@@ -70,6 +76,7 @@ function resolveSpecId(raw: string | null): SpecId {
   if (raw === 'members') return 'members';
   if (raw === 'tournaments') return 'tournaments';
   if (raw === 'enquiry') return 'enquiry';
+  if (raw === 'offers') return 'offers';
   if (raw === 'ai') return 'ai';
   return 'identity';
 }

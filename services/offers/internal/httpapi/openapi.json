@@ -1,0 +1,110 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Facinect Offers API",
+    "version": "1.0.0",
+    "description": "Phase 1: list/create promotions and discount offers, status, validate code."
+  },
+  "servers": [{ "url": "/" }],
+  "paths": {
+    "/v1/offers/health": {
+      "get": {
+        "summary": "Health",
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/v1/offers/facilities/{facilityId}/offers": {
+      "get": {
+        "summary": "List offers",
+        "parameters": [
+          { "name": "facilityId", "in": "path", "required": true, "schema": { "type": "integer" } },
+          { "name": "kind", "in": "query", "schema": { "type": "string", "enum": ["promotion", "discount", "all"] } },
+          { "name": "status", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "offers[]" } }
+      },
+      "post": {
+        "summary": "Create promotion or discount offer",
+        "parameters": [
+          { "name": "facilityId", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["code", "title", "discount_value"],
+                "properties": {
+                  "code": { "type": "string" },
+                  "title": { "type": "string" },
+                  "description": { "type": "string" },
+                  "offer_kind": { "type": "string", "enum": ["promotion", "discount"] },
+                  "discount_type": { "type": "string", "enum": ["flat", "percent"] },
+                  "discount_value": { "type": "number" },
+                  "valid_from": { "type": "string", "format": "date" },
+                  "valid_to": { "type": "string", "format": "date" },
+                  "duration_days": { "type": "integer" },
+                  "usage_limit": { "type": "integer" },
+                  "sport_id": { "type": "integer" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Offer row" } }
+      }
+    },
+    "/v1/offers/facilities/{facilityId}/offers/summary": {
+      "get": {
+        "summary": "Active non-expired offer count",
+        "parameters": [
+          { "name": "facilityId", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": { "200": { "description": "active_count" } }
+      }
+    },
+    "/v1/offers/facilities/{facilityId}/offers/validate": {
+      "get": {
+        "summary": "Validate coupon code for booking",
+        "parameters": [
+          { "name": "facilityId", "in": "path", "required": true, "schema": { "type": "integer" } },
+          { "name": "code", "in": "query", "required": true, "schema": { "type": "string" } },
+          { "name": "sport_id", "in": "query", "schema": { "type": "integer" } }
+        ],
+        "responses": { "200": { "description": "valid + discount fields" } }
+      }
+    },
+    "/v1/offers/facilities/{facilityId}/offers/{offerId}/status": {
+      "post": {
+        "summary": "Update offer status",
+        "parameters": [
+          { "name": "facilityId", "in": "path", "required": true, "schema": { "type": "integer" } },
+          { "name": "offerId", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["status"],
+                "properties": {
+                  "status": { "type": "string", "enum": ["active", "inactive"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Offer row" } }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" },
+      "serviceKey": { "type": "apiKey", "in": "header", "name": "X-Service-Key" }
+    }
+  },
+  "security": [{ "bearerAuth": [] }, { "serviceKey": [] }]
+}
