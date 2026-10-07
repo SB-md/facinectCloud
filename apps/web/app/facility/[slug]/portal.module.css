@@ -22,6 +22,12 @@
   font-family: 'Poppins', system-ui, sans-serif;
 }
 
+.shellDash {
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+}
+
 .topbar {
   grid-column: 1 / -1;
   display: grid;
@@ -730,12 +736,25 @@
   font-size: 12px;
 }
 
-/* —— Facility dashboard (signature theme) —— */
+/* —— Facility dashboard: single-viewport Facinect layout —— */
+
+.mainDash {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: calc(100dvh - 78px);
+  max-height: calc(100dvh - 78px);
+  overflow: hidden;
+  padding: 14px 20px 16px;
+}
 
 .dash {
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  flex: 1;
+  min-height: 0;
+  gap: 12px;
+  overflow: hidden;
 }
 
 .dashHint {
@@ -744,291 +763,257 @@
   color: var(--portal-muted);
 }
 
-.dashHero {
+.dashBar {
+  flex-shrink: 0;
   display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 20px;
-  flex-wrap: wrap;
-  padding: 22px 24px;
-  border-radius: 20px;
-  background:
-    linear-gradient(135deg, rgba(21, 154, 127, 0.14) 0%, rgba(0, 174, 239, 0.08) 48%, rgba(140, 198, 63, 0.1) 100%),
-    #fff;
-  border: 1px solid rgba(21, 154, 127, 0.14);
-  position: relative;
-  overflow: hidden;
-}
-
-.dashHero::after {
-  content: '';
-  position: absolute;
-  inset: auto -20% -40% 40%;
-  height: 140%;
-  background: radial-gradient(circle, rgba(0, 174, 239, 0.12), transparent 60%);
-  pointer-events: none;
-}
-
-.dashHeroCopy {
-  position: relative;
-  z-index: 1;
-}
-
-.dashKicker {
-  margin: 0 0 6px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--portal-teal-deep);
-}
-
-.dashHeroTitle {
-  margin: 0;
-  font-size: clamp(1.35rem, 2.4vw, 1.75rem);
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  color: var(--portal-ink);
-  line-height: 1.2;
-}
-
-.dashMonthBar {
-  position: relative;
-  z-index: 1;
-  display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.88);
-  border: 1px solid rgba(15, 31, 26, 0.08);
-  box-shadow: 0 1px 2px rgba(11, 42, 36, 0.04);
+  justify-content: space-between;
+  gap: 12px;
+  background: #fff;
+  border: 1px solid var(--portal-line);
+  border-radius: 14px;
+  padding: 10px 16px;
 }
 
-.dashMonthBtn {
+.dashBrand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.dashLogo {
   width: 36px;
   height: 36px;
-  border: none;
+  border-radius: 10px;
+  background: var(--portal-teal);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 750;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.dashFacName {
+  font-size: 1rem;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  color: var(--portal-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashBusy {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--portal-muted);
+  flex-shrink: 0;
+}
+
+.dashNav {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+.dashNavBtn {
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
-  background: transparent;
-  color: var(--portal-teal-deep);
+  border: 1px solid var(--portal-line);
+  background: #fff;
+  color: var(--portal-muted);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
-.dashMonthBtn:hover {
-  background: rgba(21, 154, 127, 0.12);
+.dashNavBtn:hover {
+  background: var(--portal-teal);
+  border-color: var(--portal-teal);
+  color: #fff;
 }
 
-.dashMonthLabel {
-  min-width: 148px;
+.dashNavTitle {
+  min-width: 160px;
   text-align: center;
-  padding: 0 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.dashMonthLabel span {
-  font-size: 14px;
-  font-weight: 650;
+  font-size: 1rem;
+  font-weight: 700;
   color: var(--portal-ink);
 }
 
-.dashMonthLabel em {
-  font-style: normal;
-  font-size: 10px;
-  color: var(--portal-muted);
-}
-
-.dashMetrics {
+.dashGrid {
+  flex: 1;
+  min-height: 0;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 12px;
 }
 
-.dashMetric {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 22px 22px 18px;
-  border-radius: 18px;
+.statCard {
   background: #fff;
   border: 1px solid var(--portal-line);
-  min-height: 240px;
-  transition: border-color 0.2s ease, transform 0.2s ease;
+  border-radius: 16px;
+  padding: 14px 16px 12px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  border-top-width: 3px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-.dashMetric:hover {
-  border-color: rgba(21, 154, 127, 0.28);
-  transform: translateY(-1px);
+.statCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 18px rgba(11, 42, 36, 0.06);
 }
 
-.dashMetricOk {
-  background:
-    linear-gradient(180deg, rgba(21, 154, 127, 0.06) 0%, #fff 42%),
-    #fff;
+.statOk {
+  border-top-color: var(--portal-teal);
 }
 
-.dashMetricBad {
-  background:
-    linear-gradient(180deg, rgba(196, 92, 92, 0.05) 0%, #fff 42%),
-    #fff;
+.statBad {
+  border-top-color: #c45c5c;
 }
 
-.dashMetricTop {
+.statWarn {
+  border-top-color: #d4a017;
+}
+
+.statInfo {
+  border-top-color: var(--portal-sky);
+}
+
+.statHead {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 4px;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
-.dashMetricIcon {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
+.statLabel {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--portal-muted);
 }
 
-.dashMetricOk .dashMetricIcon {
+.statBadge {
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-size: 0.65rem;
+  font-weight: 800;
+}
+
+.badgeOk {
   background: rgba(21, 154, 127, 0.12);
   color: var(--portal-teal-deep);
 }
 
-.dashMetricBad .dashMetricIcon {
-  background: rgba(196, 92, 92, 0.1);
+.badgeBad {
+  background: rgba(196, 92, 92, 0.12);
   color: #a84848;
 }
 
-.dashMetricShare {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--portal-muted);
-  letter-spacing: 0.02em;
+.badgeWarn {
+  background: rgba(212, 160, 23, 0.14);
+  color: #9a750f;
 }
 
-.dashMetricLabel {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--portal-muted);
-  letter-spacing: 0.02em;
+.badgeInfo {
+  background: rgba(0, 174, 239, 0.12);
+  color: #0284c7;
 }
 
-.dashMetricValue {
-  margin: 0;
-  font-size: clamp(2.4rem, 4vw, 3.1rem);
-  font-weight: 750;
-  line-height: 1;
-  letter-spacing: -0.04em;
+.statValue {
+  margin-top: 4px;
+  font-size: clamp(1.55rem, 2.6vw, 1.9rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
   color: var(--portal-ink);
+  flex-shrink: 0;
 }
 
-.dashMetricOk .dashMetricValue {
-  color: var(--portal-teal-deep);
-}
-
-.dashMetricBad .dashMetricValue {
-  color: #9a4444;
-}
-
-.dashSpark {
+.statChart {
   width: 100%;
-  height: 56px;
-  margin: 8px 0 4px;
+  height: 64px;
+  margin: 8px 0;
+  flex: 1;
+  min-height: 48px;
+  max-height: 72px;
 }
 
-.dashMetricCta {
+.statPlaceholder {
+  flex: 1;
+  min-height: 48px;
+  max-height: 72px;
+  margin: 8px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 0.7rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--portal-muted);
+  background: #f4faf8;
+  border: 1px dashed rgba(15, 31, 26, 0.12);
+  border-radius: 10px;
+  padding: 8px;
+}
+
+.statFoot {
   margin-top: auto;
-  padding-top: 12px;
-  border-top: 1px solid var(--portal-line);
+  padding-top: 10px;
+  border-top: 1px solid rgba(15, 31, 26, 0.06);
+  display: flex;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+
+.statDetails {
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--portal-teal-deep);
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  font-weight: 650;
-  color: var(--portal-teal-deep);
-  text-decoration: none;
+  gap: 5px;
 }
 
-.dashMetricBad .dashMetricCta {
-  color: #9a4444;
+.statDetailsBad {
+  color: #a84848;
 }
 
-.dashMetricCta i {
-  font-size: 11px;
+.statDetailsWarn {
+  color: #9a750f;
+}
+
+.statDetailsInfo {
+  color: #0284c7;
+}
+
+.statDetails i {
+  font-size: 10px;
   transition: transform 0.15s ease;
 }
 
-.dashMetricCta:hover i {
-  transform: translateX(3px);
-}
-
-.dashSecondary {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
-}
-
-.dashSoft {
-  padding: 18px 18px 16px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid var(--portal-line);
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-height: 132px;
-}
-
-.dashSoftHead {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  font-weight: 650;
-  color: var(--portal-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin-bottom: 4px;
-}
-
-.dashSoftHead i {
-  color: var(--portal-teal);
-  font-size: 13px;
-}
-
-.dashSoftValue {
-  margin: 0;
-  font-size: 1.35rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  color: var(--portal-ink);
-}
-
-.dashSoftNote {
-  margin: 0;
-  font-size: 12px;
-  color: var(--portal-muted);
-  flex: 1;
-}
-
-.dashSoftLink {
-  margin-top: 8px;
-  font-size: 13px;
-  font-weight: 650;
-  color: var(--portal-teal-deep);
-  text-decoration: none;
-}
-
-.dashSoftLink:hover {
-  text-decoration: underline;
+.statDetails:hover i {
+  transform: translateX(2px);
 }
 
 @media (max-width: 900px) {
@@ -1045,12 +1030,20 @@
     height: 44px;
   }
 
-  .dashMetrics,
-  .dashSecondary {
-    grid-template-columns: 1fr;
+  .mainDash {
+    height: auto;
+    max-height: none;
+    overflow: auto;
+    padding: 12px 14px 20px;
   }
 
-  .dashHero {
-    padding: 18px;
+  .dashGrid {
+    grid-template-columns: 1fr;
+    grid-template-rows: none;
+    overflow: auto;
+  }
+
+  .statCard {
+    min-height: 168px;
   }
 }

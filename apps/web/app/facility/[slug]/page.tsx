@@ -16,12 +16,8 @@ import styles from './portal.module.css';
 
 export default function FacilityDashboardPage() {
   return (
-    <FacilityShell
-      pageKey="dashboard"
-      title="Overview"
-      description="This month at a glance."
-    >
-      <Suspense fallback={<p className={styles.dashHint}>Loading overview…</p>}>
+    <FacilityShell pageKey="dashboard" title="Dashboard" description="">
+      <Suspense fallback={<p className={styles.dashHint}>Loading…</p>}>
         <DashboardBody />
       </Suspense>
     </FacilityShell>
@@ -94,7 +90,7 @@ function DashboardBody() {
   }
 
   if (!loaded) {
-    return <p className={styles.dashHint}>Loading overview…</p>;
+    return <p className={styles.dashHint}>Loading…</p>;
   }
 
   if (!facilityId) {
@@ -103,105 +99,87 @@ function DashboardBody() {
 
   const viewBase = `/facility/${encodeURIComponent(slug)}/view-bookings`;
   const fromDash = `from=dashboard&month=${month}`;
+  const initial = (facility?.facilityName || slug).trim().charAt(0).toUpperCase() || 'F';
 
   return (
     <div className={styles.dash}>
-      <header className={styles.dashHero}>
-        <div className={styles.dashHeroCopy}>
-          <p className={styles.dashKicker}>Facility pulse</p>
-          <h2 className={styles.dashHeroTitle}>{facility?.facilityName || slug}</h2>
+      <header className={styles.dashBar}>
+        <div className={styles.dashBrand}>
+          <span className={styles.dashLogo} aria-hidden>
+            {initial}
+          </span>
+          <strong className={styles.dashFacName}>{facility?.facilityName || slug}</strong>
         </div>
-        <div className={styles.dashMonthBar} role="group" aria-label="Select month">
-          <button type="button" className={styles.dashMonthBtn} aria-label="Previous month" onClick={() => goMonth(-1)}>
-            <i className="fa-solid fa-chevron-left" />
-          </button>
-          <div className={styles.dashMonthLabel}>
-            <span>{monthLabel}</span>
-            {busy ? <em>Updating…</em> : null}
-          </div>
-          <button type="button" className={styles.dashMonthBtn} aria-label="Next month" onClick={() => goMonth(1)}>
-            <i className="fa-solid fa-chevron-right" />
-          </button>
-        </div>
+        {busy ? <span className={styles.dashBusy}>Updating…</span> : null}
       </header>
+
+      <div className={styles.dashNav} role="group" aria-label="Select month">
+        <button type="button" className={styles.dashNavBtn} aria-label="Previous month" onClick={() => goMonth(-1)}>
+          <i className="fa-solid fa-chevron-left" />
+        </button>
+        <div className={styles.dashNavTitle}>{monthLabel}</div>
+        <button type="button" className={styles.dashNavBtn} aria-label="Next month" onClick={() => goMonth(1)}>
+          <i className="fa-solid fa-chevron-right" />
+        </button>
+      </div>
 
       {err && <p className={styles.settingsErr}>{err}</p>}
 
-      <div className={styles.dashMetrics}>
-        <article className={`${styles.dashMetric} ${styles.dashMetricOk}`}>
-          <div className={styles.dashMetricTop}>
-            <span className={styles.dashMetricIcon} aria-hidden>
-              <i className="fa-solid fa-calendar-check" />
-            </span>
-            <span className={styles.dashMetricShare}>{confPct}%</span>
+      <div className={styles.dashGrid}>
+        <article className={`${styles.statCard} ${styles.statOk}`}>
+          <div className={styles.statHead}>
+            <span className={styles.statLabel}>Confirmed bookings</span>
+            <span className={`${styles.statBadge} ${styles.badgeOk}`}>{confPct}%</span>
           </div>
-          <p className={styles.dashMetricLabel}>Confirmed</p>
-          <p className={styles.dashMetricValue}>{confSum.count}</p>
-          <Sparkline
-            values={confSum.weekly}
-            stroke="var(--portal-teal)"
-            fill="rgba(21, 154, 127, 0.14)"
-          />
-          <Link href={`${viewBase}?${fromDash}&status=confirmed`} className={styles.dashMetricCta}>
-            View details
-            <i className="fa-solid fa-arrow-right" />
-          </Link>
+          <div className={styles.statValue}>{confSum.count}</div>
+          <Sparkline values={confSum.weekly} stroke="rgba(21, 154, 127, 1)" fill="rgba(21, 154, 127, 0.16)" />
+          <div className={styles.statFoot}>
+            <Link href={`${viewBase}?${fromDash}&status=confirmed`} className={styles.statDetails}>
+              View details <i className="fa-solid fa-arrow-right" />
+            </Link>
+          </div>
         </article>
 
-        <article className={`${styles.dashMetric} ${styles.dashMetricBad}`}>
-          <div className={styles.dashMetricTop}>
-            <span className={styles.dashMetricIcon} aria-hidden>
-              <i className="fa-solid fa-calendar-xmark" />
-            </span>
-            <span className={styles.dashMetricShare}>{canPct}%</span>
+        <article className={`${styles.statCard} ${styles.statBad}`}>
+          <div className={styles.statHead}>
+            <span className={styles.statLabel}>Cancellations</span>
+            <span className={`${styles.statBadge} ${styles.badgeBad}`}>{canPct}%</span>
           </div>
-          <p className={styles.dashMetricLabel}>Cancelled</p>
-          <p className={styles.dashMetricValue}>{canSum.count}</p>
-          <Sparkline
-            values={canSum.weekly}
-            stroke="#c45c5c"
-            fill="rgba(196, 92, 92, 0.12)"
-          />
-          <Link href={`${viewBase}?${fromDash}&status=cancelled`} className={styles.dashMetricCta}>
-            View details
-            <i className="fa-solid fa-arrow-right" />
-          </Link>
+          <div className={styles.statValue}>{canSum.count}</div>
+          <Sparkline values={canSum.weekly} stroke="rgba(196, 92, 92, 1)" fill="rgba(196, 92, 92, 0.12)" />
+          <div className={styles.statFoot}>
+            <Link href={`${viewBase}?${fromDash}&status=cancelled`} className={`${styles.statDetails} ${styles.statDetailsBad}`}>
+              View details <i className="fa-solid fa-arrow-right" />
+            </Link>
+          </div>
         </article>
-      </div>
 
-      <div className={styles.dashSecondary}>
-        <article className={styles.dashSoft}>
-          <div className={styles.dashSoftHead}>
-            <i className="fa-solid fa-user-graduate" />
-            <span>Students</span>
+        <article className={`${styles.statCard} ${styles.statWarn}`}>
+          <div className={styles.statHead}>
+            <span className={styles.statLabel}>Students</span>
+            <span className={`${styles.statBadge} ${styles.badgeWarn}`}>Soon</span>
           </div>
-          <p className={styles.dashSoftValue}>—</p>
-          <p className={styles.dashSoftNote}>Coming soon</p>
-          <Link href={`/facility/${encodeURIComponent(slug)}/students`} className={styles.dashSoftLink}>
-            Open
-          </Link>
+          <div className={styles.statValue}>—</div>
+          <div className={styles.statPlaceholder}>Students service not wired yet</div>
+          <div className={styles.statFoot}>
+            <Link href={`/facility/${encodeURIComponent(slug)}/students`} className={`${styles.statDetails} ${styles.statDetailsWarn}`}>
+              Analytics <i className="fa-solid fa-arrow-right" />
+            </Link>
+          </div>
         </article>
-        <article className={styles.dashSoft}>
-          <div className={styles.dashSoftHead}>
-            <i className="fa-solid fa-users" />
-            <span>Members</span>
+
+        <article className={`${styles.statCard} ${styles.statInfo}`}>
+          <div className={styles.statHead}>
+            <span className={styles.statLabel}>Registered members</span>
+            <span className={`${styles.statBadge} ${styles.badgeInfo}`}>Soon</span>
           </div>
-          <p className={styles.dashSoftValue}>—</p>
-          <p className={styles.dashSoftNote}>Coming soon</p>
-          <Link href={`/facility/${encodeURIComponent(slug)}/members`} className={styles.dashSoftLink}>
-            Open
-          </Link>
-        </article>
-        <article className={styles.dashSoft}>
-          <div className={styles.dashSoftHead}>
-            <i className="fa-solid fa-table-cells" />
-            <span>Slots</span>
+          <div className={styles.statValue}>—</div>
+          <div className={styles.statPlaceholder}>Members service not wired yet</div>
+          <div className={styles.statFoot}>
+            <Link href={`/facility/${encodeURIComponent(slug)}/members`} className={`${styles.statDetails} ${styles.statDetailsInfo}`}>
+              Manage pool <i className="fa-solid fa-arrow-right" />
+            </Link>
           </div>
-          <p className={styles.dashSoftValue}>Setup</p>
-          <p className={styles.dashSoftNote}>Courts & availability</p>
-          <Link href={`/facility/${encodeURIComponent(slug)}/slots-setup`} className={styles.dashSoftLink}>
-            Open
-          </Link>
         </article>
       </div>
     </div>
@@ -217,8 +195,8 @@ function Sparkline({
   stroke: string;
   fill: string;
 }) {
-  const w = 240;
-  const h = 56;
+  const w = 220;
+  const h = 64;
   const pad = 4;
   const max = Math.max(1, ...values);
   const step = (w - pad * 2) / Math.max(1, values.length - 1);
@@ -231,13 +209,13 @@ function Sparkline({
   const area = `${pad},${h - pad} ${line} ${w - pad},${h - pad}`;
 
   return (
-    <svg className={styles.dashSpark} viewBox={`0 0 ${w} ${h}`} role="img" aria-label="Weekly trend">
+    <svg className={styles.statChart} viewBox={`0 0 ${w} ${h}`} role="img" aria-label="Weekly trend">
       <polygon points={area} fill={fill} />
       <polyline
         points={line}
         fill="none"
         stroke={stroke}
-        strokeWidth="2.25"
+        strokeWidth="2.5"
         strokeLinejoin="round"
         strokeLinecap="round"
       />
