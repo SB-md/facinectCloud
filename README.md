@@ -121,6 +121,9 @@ Put nginx/Caddy on `:443` → `127.0.0.1:8081` for TLS. Keep RoutForge on `:8080
 | GET | `/v1/offers/health` | Offers health |
 | GET | `/v1/offers/facilities/{id}/offers` | List promotions / discounts |
 | POST | `/v1/offers/facilities/{id}/offers` | Create offer |
+| GET | `/v1/administration/health` | Administration health |
+| GET | `/v1/administration/facilities/{id}/profile` | Facility profile |
+| PUT | `/v1/administration/facilities/{id}/profile` | Update facility profile |
 | GET | `/docs` | Swagger UI (Identity / Notifications / Booking) |
 | GET | `/api/health` | Web health |
 | POST | `/v1/auth/check-email` | Email exists? |

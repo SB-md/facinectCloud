@@ -60,6 +60,12 @@ const SPECS = [
     blurb: 'Promotions and discount coupons — /v1/offers',
   },
   {
+    id: 'administration',
+    label: 'Administration',
+    url: '/v1/administration/openapi.json',
+    blurb: 'Facility profile, sports, staff, payments — /v1/administration',
+  },
+  {
     id: 'ai',
     label: 'AI',
     url: '/v1/ai/openapi.json',
@@ -77,6 +83,7 @@ function resolveSpecId(raw: string | null): SpecId {
   if (raw === 'tournaments') return 'tournaments';
   if (raw === 'enquiry') return 'enquiry';
   if (raw === 'offers') return 'offers';
+  if (raw === 'administration') return 'administration';
   if (raw === 'ai') return 'ai';
   return 'identity';
 }
