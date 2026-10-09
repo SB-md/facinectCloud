@@ -114,6 +114,25 @@ Put nginx/Caddy on `:443` → `127.0.0.1:8081` for TLS. Keep RoutForge on `:8080
 | GET | `/v1/tournaments/health` | Tournaments health |
 | GET | `/v1/tournaments/facilities/{id}/tournaments` | List tournaments |
 | POST | `/v1/tournaments/facilities/{id}/tournaments` | Create tournament |
+| GET | `/v1/ai/health` | Shared AI health |
+| POST | `/v1/ai/enquiry/analyze` | Analyze enquiry transcript |
+| GET | `/v1/enquiry/health` | Enquiry health |
+| GET | `/v1/enquiry/facilities/{id}/enquiries` | List enquiries |
+| GET | `/v1/offers/health` | Offers health |
+| GET | `/v1/offers/facilities/{id}/offers` | List promotions / discounts |
+| POST | `/v1/offers/facilities/{id}/offers` | Create offer |
+| GET | `/v1/administration/health` | Administration health |
+| GET | `/v1/administration/facilities/{id}/profile` | Facility profile |
+| PUT | `/v1/administration/facilities/{id}/profile` | Update facility profile |
+| GET | `/v1/add-facility/health` | Add-facility health |
+| POST | `/v1/add-facility/requests` | Submit facility request |
+| POST | `/v1/add-facility/requests/{id}/approve` | Approve + provision facility |
+| GET | `/v1/payments/health` | Payments health |
+| GET | `/v1/payments/facilities/{id}/ledger` | Payment ledger |
+| POST | `/v1/payments/facilities/{id}/payments` | Record ledger entry |
+| GET | `/v1/gateway/health` | Payment gateway abstraction health |
+| POST | `/v1/gateway/orders` | Create provider order (stub/Razorpay) |
+| POST | `/v1/gateway/verify` | Verify payment signature |
 | GET | `/docs` | Swagger UI (Identity / Notifications / Booking) |
 | GET | `/api/health` | Web health |
 | POST | `/v1/auth/check-email` | Email exists? |
