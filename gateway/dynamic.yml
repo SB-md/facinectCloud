@@ -9,3 +9,7 @@ http:
       rateLimit:
         average: 30
         burst: 60
+    rate-notify:
+      rateLimit:
+        average: 40
+        burst: 80
