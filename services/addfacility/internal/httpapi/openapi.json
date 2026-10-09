@@ -1,0 +1,59 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Facinect Add Facility API",
+    "version": "1.0.0",
+    "description": "Phase 1: submit additional/first facility requests, list mine, approve/reject (creates identity facility + admin membership)."
+  },
+  "servers": [{ "url": "/" }],
+  "paths": {
+    "/v1/add-facility/health": {
+      "get": { "summary": "Health", "responses": { "200": { "description": "OK" } } }
+    },
+    "/v1/add-facility/requests": {
+      "post": {
+        "summary": "Submit facility request",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["facility_name", "location"],
+                "properties": {
+                  "facility_name": { "type": "string" },
+                  "location": { "type": "string" },
+                  "contact_name": { "type": "string" },
+                  "whatsapp": { "type": "string" },
+                  "google_map_url": { "type": "string" },
+                  "notes": { "type": "string" },
+                  "sports": { "type": "array", "items": { "type": "object" } }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Request row" } }
+      }
+    },
+    "/v1/add-facility/requests/mine": {
+      "get": { "summary": "List my requests", "responses": { "200": { "description": "requests[]" } } }
+    },
+    "/v1/add-facility/requests/pending": {
+      "get": { "summary": "List pending (reviewer / service key)", "responses": { "200": { "description": "requests[]" } } }
+    },
+    "/v1/add-facility/requests/{requestId}/approve": {
+      "post": { "summary": "Approve and provision facility", "responses": { "200": { "description": "Request row" } } }
+    },
+    "/v1/add-facility/requests/{requestId}/reject": {
+      "post": { "summary": "Reject request", "responses": { "200": { "description": "Request row" } } }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" },
+      "serviceKey": { "type": "apiKey", "in": "header", "name": "X-Service-Key" }
+    }
+  },
+  "security": [{ "bearerAuth": [] }, { "serviceKey": [] }]
+}

@@ -1,0 +1,30 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Facinect Enquiry API",
+    "version": "1.0.0",
+    "description": "Enquiry inbox with shared AI analyze/suggest (calls facinect-ai)."
+  },
+  "servers": [{ "url": "/" }],
+  "paths": {
+    "/v1/enquiry/health": {
+      "get": { "summary": "Health", "responses": { "200": { "description": "OK" } } }
+    },
+    "/v1/enquiry/facilities/{facilityId}/enquiries": {
+      "get": { "summary": "List enquiries", "responses": { "200": { "description": "enquiries[]" } } },
+      "post": {
+        "summary": "Create enquiry (optional AI analyze)",
+        "responses": { "200": { "description": "Enquiry" } }
+      }
+    },
+    "/v1/enquiry/enquiries/{enquiryId}/analyze": {
+      "post": { "summary": "Re-run AI analyze", "responses": { "200": { "description": "Enquiry" } } }
+    },
+    "/v1/enquiry/enquiries/{enquiryId}/suggest-reply": {
+      "post": { "summary": "Suggest reply via AI", "responses": { "200": { "description": "reply" } } }
+    },
+    "/v1/enquiry/enquiries/{enquiryId}/notify": {
+      "post": { "summary": "Send WhatsApp via notifications", "responses": { "200": { "description": "ok" } } }
+    }
+  }
+}

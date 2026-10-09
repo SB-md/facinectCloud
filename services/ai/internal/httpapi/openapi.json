@@ -1,0 +1,44 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Facinect AI API",
+    "version": "1.0.0",
+    "description": "Shared AI skills for Facinect (enquiry analyze, reply suggest). More skills can be added later."
+  },
+  "servers": [{ "url": "/" }],
+  "paths": {
+    "/v1/ai/health": {
+      "get": { "summary": "Health", "responses": { "200": { "description": "OK" } } }
+    },
+    "/v1/ai/enquiry/analyze": {
+      "post": {
+        "summary": "Analyze enquiry transcript",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["transcript"],
+                "properties": { "transcript": { "type": "string" } }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "ai_data" } }
+      }
+    },
+    "/v1/ai/reply/suggest": {
+      "post": {
+        "summary": "Suggest reply text from ai_data",
+        "responses": { "200": { "description": "reply" } }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "serviceKey": { "type": "apiKey", "in": "header", "name": "X-Service-Key" }
+    }
+  },
+  "security": [{ "serviceKey": [] }]
+}
