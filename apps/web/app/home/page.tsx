@@ -84,8 +84,15 @@ export default function HomePage() {
                 </strong>
               </div>
             </div>
-            <p className={styles.hint}>No facilities assigned yet — complete onboarding next.</p>
-            <button type="button" className={styles.btn} onClick={onLogout}>
+            <p className={styles.hint}>No facilities assigned yet — request one to get started.</p>
+            <button
+              type="button"
+              className={styles.btn}
+              onClick={() => router.push('/add-facility')}
+            >
+              Add facility
+            </button>
+            <button type="button" className={styles.btn} onClick={onLogout} style={{ marginTop: 8 }}>
               Sign out
             </button>
           </>

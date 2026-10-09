@@ -1025,6 +1025,92 @@
   transform: translateX(2px);
 }
 
+.enquiryLayout {
+  display: grid;
+  grid-template-columns: minmax(280px, 380px) 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+.enquirySide {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.enquiryList {
+  max-height: 420px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.enquiryItem {
+  text-align: left;
+  border: 1px solid var(--portal-line);
+  background: #fff;
+  border-radius: 12px;
+  padding: 10px 12px;
+  cursor: pointer;
+  font: inherit;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 8px;
+}
+
+.enquiryItemActive {
+  border-color: var(--portal-teal);
+  background: rgba(21, 154, 127, 0.06);
+}
+
+.enquiryItemMeta {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  color: var(--portal-muted);
+}
+
+.enquiryTextarea {
+  width: 100%;
+  border: 1px solid var(--portal-line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 14px;
+  resize: vertical;
+}
+
+.enquiryTranscript {
+  white-space: pre-wrap;
+  background: #f4faf8;
+  border: 1px solid var(--portal-line);
+  border-radius: 10px;
+  padding: 12px;
+  font-size: 13px;
+  line-height: 1.55;
+  margin: 6px 0 0;
+  max-height: 220px;
+  overflow: auto;
+}
+
+.enquiryDetailHead {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.enquiryLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--portal-muted);
+  margin: 0;
+
+}
+
 @media (max-width: 900px) {
   .main {
     padding: 18px 16px 32px;
@@ -1037,6 +1123,9 @@
   .brandLogo {
     width: 44px;
     height: 44px;
+  }
+  .enquiryLayout {
+    grid-template-columns: 1fr;
   }
 
   .mainDash {

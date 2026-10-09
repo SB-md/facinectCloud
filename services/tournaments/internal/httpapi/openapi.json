@@ -1,0 +1,101 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Facinect Tournaments API",
+    "version": "1.0.0",
+    "description": "Phase 1: list, create, update tournament metadata (no fixtures yet)."
+  },
+  "servers": [{ "url": "/" }],
+  "paths": {
+    "/v1/tournaments/health": {
+      "get": {
+        "summary": "Health",
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/v1/tournaments/facilities/{facilityId}/tournaments": {
+      "get": {
+        "summary": "List tournaments",
+        "parameters": [
+          { "name": "facilityId", "in": "path", "required": true, "schema": { "type": "integer" } },
+          { "name": "status", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "tournaments[]" } }
+      },
+      "post": {
+        "summary": "Create tournament",
+        "parameters": [
+          { "name": "facilityId", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name"],
+                "properties": {
+                  "name": { "type": "string" },
+                  "sport_id": { "type": "integer" },
+                  "start_date": { "type": "string", "format": "date" },
+                  "end_date": { "type": "string", "format": "date" },
+                  "venue_address": { "type": "string" },
+                  "location_url": { "type": "string" },
+                  "contact_numbers": { "type": "string" },
+                  "rules": { "type": "string" },
+                  "slug": { "type": "string" },
+                  "status": {
+                    "type": "string",
+                    "enum": ["draft", "upcoming", "live", "completed", "cancelled"]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Tournament" } }
+      }
+    },
+    "/v1/tournaments/facilities/{facilityId}/tournaments/summary": {
+      "get": {
+        "summary": "Active tournament count",
+        "parameters": [
+          { "name": "facilityId", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": { "200": { "description": "active_count" } }
+      }
+    },
+    "/v1/tournaments/tournaments/{tournamentId}": {
+      "get": {
+        "summary": "Get tournament",
+        "parameters": [
+          { "name": "tournamentId", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": { "200": { "description": "Tournament" } }
+      },
+      "post": {
+        "summary": "Update tournament",
+        "parameters": [
+          { "name": "tournamentId", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": { "200": { "description": "Tournament" } }
+      }
+    },
+    "/v1/tournaments/tournaments/{tournamentId}/status": {
+      "post": {
+        "summary": "Update status only",
+        "parameters": [
+          { "name": "tournamentId", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": { "200": { "description": "Tournament" } }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" },
+      "serviceKey": { "type": "apiKey", "in": "header", "name": "X-Service-Key" }
+    }
+  },
+  "security": [{ "bearerAuth": [] }, { "serviceKey": [] }]
+}
