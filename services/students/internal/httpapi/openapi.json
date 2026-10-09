@@ -1,0 +1,108 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Facinect Students API",
+    "version": "1.0.0",
+    "description": "Phase 1: list students, enroll, and mark attendance by date."
+  },
+  "servers": [{ "url": "/" }],
+  "paths": {
+    "/v1/students/health": {
+      "get": {
+        "summary": "Health",
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/v1/students/facilities/{facilityId}/students": {
+      "get": {
+        "summary": "List enrollments",
+        "parameters": [
+          { "name": "facilityId", "in": "path", "required": true, "schema": { "type": "integer" } },
+          { "name": "sport_id", "in": "query", "schema": { "type": "integer" } },
+          { "name": "status", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "students[]" } }
+      },
+      "post": {
+        "summary": "Enroll a student",
+        "parameters": [
+          { "name": "facilityId", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["first_name"],
+                "properties": {
+                  "first_name": { "type": "string" },
+                  "last_name": { "type": "string" },
+                  "contact_email": { "type": "string" },
+                  "contact_phone": { "type": "string" },
+                  "whatsapp": { "type": "string" },
+                  "sport_id": { "type": "integer" },
+                  "plan_name": { "type": "string" },
+                  "start_date": { "type": "string", "format": "date" },
+                  "end_date": { "type": "string", "format": "date" },
+                  "actual_fee": { "type": "number" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Enrollment row" } }
+      }
+    },
+    "/v1/students/facilities/{facilityId}/students/summary": {
+      "get": {
+        "summary": "Active enrollment count",
+        "parameters": [
+          { "name": "facilityId", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": { "200": { "description": "active_count" } }
+      }
+    },
+    "/v1/students/facilities/{facilityId}/attendance": {
+      "get": {
+        "summary": "Attendance for a date",
+        "parameters": [
+          { "name": "facilityId", "in": "path", "required": true, "schema": { "type": "integer" } },
+          { "name": "date", "in": "query", "required": true, "schema": { "type": "string", "format": "date" } }
+        ],
+        "responses": { "200": { "description": "attendance[]" } }
+      },
+      "post": {
+        "summary": "Mark attendance",
+        "parameters": [
+          { "name": "facilityId", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["enrollment_id", "date", "status"],
+                "properties": {
+                  "enrollment_id": { "type": "integer" },
+                  "date": { "type": "string", "format": "date" },
+                  "status": { "type": "string", "enum": ["present", "absent", "leave"] },
+                  "notes": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Attendance row" } }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" },
+      "serviceKey": { "type": "apiKey", "in": "header", "name": "X-Service-Key" }
+    }
+  },
+  "security": [{ "bearerAuth": [] }, { "serviceKey": [] }]
+}

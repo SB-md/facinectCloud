@@ -1,0 +1,99 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Facinect Members API",
+    "version": "1.0.0",
+    "description": "Phase 1: list memberships, register members, update membership status."
+  },
+  "servers": [{ "url": "/" }],
+  "paths": {
+    "/v1/members/health": {
+      "get": {
+        "summary": "Health",
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/v1/members/facilities/{facilityId}/members": {
+      "get": {
+        "summary": "List memberships",
+        "parameters": [
+          { "name": "facilityId", "in": "path", "required": true, "schema": { "type": "integer" } },
+          { "name": "sport_id", "in": "query", "schema": { "type": "integer" } },
+          { "name": "status", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "members[]" } }
+      },
+      "post": {
+        "summary": "Register a member + membership",
+        "parameters": [
+          { "name": "facilityId", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["full_name"],
+                "properties": {
+                  "full_name": { "type": "string" },
+                  "contact_email": { "type": "string" },
+                  "contact_phone": { "type": "string" },
+                  "whatsapp": { "type": "string" },
+                  "sport_id": { "type": "integer" },
+                  "plan_name": { "type": "string" },
+                  "team_name": { "type": "string" },
+                  "start_date": { "type": "string", "format": "date" },
+                  "end_date": { "type": "string", "format": "date" },
+                  "subscription_fee": { "type": "number" },
+                  "primary_member": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Membership row" } }
+      }
+    },
+    "/v1/members/facilities/{facilityId}/members/summary": {
+      "get": {
+        "summary": "Active membership count",
+        "parameters": [
+          { "name": "facilityId", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": { "200": { "description": "active_count" } }
+      }
+    },
+    "/v1/members/facilities/{facilityId}/memberships/{membershipId}/status": {
+      "post": {
+        "summary": "Update membership status",
+        "parameters": [
+          { "name": "facilityId", "in": "path", "required": true, "schema": { "type": "integer" } },
+          { "name": "membershipId", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["status"],
+                "properties": {
+                  "status": { "type": "string", "enum": ["active", "inactive", "expired"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Membership row" } }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" },
+      "serviceKey": { "type": "apiKey", "in": "header", "name": "X-Service-Key" }
+    }
+  },
+  "security": [{ "bearerAuth": [] }, { "serviceKey": [] }]
+}

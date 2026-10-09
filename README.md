@@ -59,6 +59,10 @@ RoutForge already uses **host `:8080`** and **`:5432`**. Facinect prod compose u
 
 ### Deploy on VPS
 
+Public URL: **https://cloud.facinect.com/** (Traefik upstream on host `:8081`, image `traefik:v3.7.13`).
+
+`.env.prod` is gitignored — `git pull` does **not** overwrite it. Copy from `.env.prod.example` **once** only; never re-copy after updates.
+
 ```bash
 # 1) SSH
 ssh bharathi@169.58.139.45
@@ -68,9 +72,9 @@ cd ~
 # scp -r from laptop, or git clone
 cd facinect-microservices
 
-# 3) Env + keys
+# 3) Env + keys (first time only for cp)
 cp .env.prod.example .env.prod
-nano .env.prod   # strong DB + admin passwords, Google OAuth
+nano .env.prod   # strong DB + admin passwords, Google OAuth, Meta
 chmod +x scripts/*.sh
 ./scripts/generate-jwt-keys.sh
 
@@ -82,13 +86,13 @@ chmod +x scripts/*.sh
 
 # 6) Verify
 curl -s http://127.0.0.1:8081/v1/auth/health
-# Browser: http://169.58.139.45:8081/login
+# Browser: https://cloud.facinect.com/login
 ```
 
-Google Console redirect URI for this phase:
-`http://169.58.139.45:8081/v1/auth/google/callback`
+Google Console redirect URI:
+`https://cloud.facinect.com/v1/auth/google/callback`
 
-Later (domain + HTTPS): put nginx/Caddy in front of `:8081` or add Traefik Let's Encrypt — keep RoutForge on `:8080` unless you unify under one reverse proxy.
+Put nginx/Caddy on `:443` → `127.0.0.1:8081` for TLS. Keep RoutForge on `:8080` unless you unify under one reverse proxy. See `docs/VPS_DEPLOY.md`.
 
 ## Identity API (Go, via gateway)
 
@@ -101,6 +105,12 @@ Later (domain + HTTPS): put nginx/Caddy in front of `:8081` or add Traefik Let's
 | GET | `/v1/booking/health` | Booking health |
 | GET | `/v1/booking/facilities/{id}/slots` | View slots |
 | POST | `/v1/booking/facilities/{id}/bookings` | Create booking |
+| GET | `/v1/students/health` | Students health |
+| GET | `/v1/students/facilities/{id}/students` | List enrollments |
+| POST | `/v1/students/facilities/{id}/attendance` | Mark attendance |
+| GET | `/v1/members/health` | Members health |
+| GET | `/v1/members/facilities/{id}/members` | List memberships |
+| POST | `/v1/members/facilities/{id}/members` | Register member |
 | GET | `/docs` | Swagger UI (Identity / Notifications / Booking) |
 | GET | `/api/health` | Web health |
 | POST | `/v1/auth/check-email` | Email exists? |

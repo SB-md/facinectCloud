@@ -705,6 +705,15 @@
   color: #b91c1c;
 }
 
+.statusWarn {
+  background: rgba(212, 160, 23, 0.14);
+  color: #9a750f;
+}
+
+.statusMuted {
+  font-size: 12px;
+  color: var(--portal-muted);
+}
 
 /* —— Back navigation —— */
 
