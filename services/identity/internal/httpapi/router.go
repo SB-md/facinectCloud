@@ -44,11 +44,10 @@ func (s *Server) Handler() http.Handler {
 
 func (s *Server) withCORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		origin := s.Cfg.CORSOrigins
-		if origin == "" {
-			origin = "*"
+		if origin := s.corsOrigin(); origin != "" {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Vary", "Origin")
 		}
-		w.Header().Set("Access-Control-Allow-Origin", origin)
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 		if r.Method == http.MethodOptions {
@@ -57,6 +56,21 @@ func (s *Server) withCORS(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// corsOrigin: production never emits wildcard *; local may use *.
+func (s *Server) corsOrigin() string {
+	o := strings.TrimSpace(s.Cfg.CORSOrigins)
+	if o == "" {
+		if s.Cfg.AppEnv == "local" || s.Cfg.AppEnv == "development" {
+			return "*"
+		}
+		return ""
+	}
+	if o == "*" && s.Cfg.AppEnv != "local" && s.Cfg.AppEnv != "development" {
+		return ""
+	}
+	return o
 }
 
 func (s *Server) redirectLogin(w http.ResponseWriter, r *http.Request) {
@@ -301,7 +315,8 @@ func (s *Server) handleSetPassword(w http.ResponseWriter, r *http.Request) {
 	if next == "" {
 		next, _ = body["password"].(string)
 	}
-	if err := s.Auth.SetPassword(user.ID, next); err != nil {
+	current, _ := body["current_password"].(string)
+	if err := s.Auth.SetPassword(user.ID, current, next); err != nil {
 		status := http.StatusBadRequest
 		if err == auth.ErrUnauthorized {
 			status = http.StatusUnauthorized

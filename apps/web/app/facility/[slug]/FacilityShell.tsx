@@ -99,7 +99,7 @@ function PortalLayout({
   const settingsActive = pathname?.endsWith('/settings');
 
   return (
-    <div className={styles.shell}>
+    <div className={`${styles.shell} ${pageKey === 'dashboard' ? styles.shellDash : ''}`}>
       <header className={styles.topbar}>
         <div className={styles.topLeft}>
           <button
@@ -209,11 +209,13 @@ function PortalLayout({
         </div>
       </aside>
 
-      <main className={styles.main}>
-        <div className={styles.pageHead}>
-          <h1>{title}</h1>
-          <p>{description || `Manage ${title.toLowerCase()} for ${current?.facilityName || slug}.`}</p>
-        </div>
+      <main className={`${styles.main} ${pageKey === 'dashboard' ? styles.mainDash : ''}`}>
+        {pageKey === 'dashboard' ? null : (
+          <div className={styles.pageHead}>
+            <h1>{title}</h1>
+            <p>{description || `Manage ${title.toLowerCase()} for ${current?.facilityName || slug}.`}</p>
+          </div>
+        )}
 
         {children ? (
           children

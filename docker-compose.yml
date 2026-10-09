@@ -169,6 +169,7 @@ services:
       - traefik.http.routers.notifications.rule=PathPrefix(`/v1/notifications`)
       - traefik.http.routers.notifications.entrypoints=web
       - traefik.http.routers.notifications.priority=20
+      - traefik.http.routers.notifications.middlewares=rate-notify@file
       - traefik.http.services.notifications.loadbalancer.server.port=8080
     networks:
       - facinect_internal

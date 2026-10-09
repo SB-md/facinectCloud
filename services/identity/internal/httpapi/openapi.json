@@ -467,7 +467,7 @@
     "/v1/auth/password": {
       "post": {
         "tags": ["auth"],
-        "summary": "Set or update password (no current password required)",
+        "summary": "Set or update password (current_password required if account already has one)",
         "security": [{ "bearerAuth": [] }],
         "requestBody": {
           "required": true,
@@ -476,8 +476,9 @@
               "schema": {
                 "type": "object",
                 "properties": {
+                  "current_password": { "type": "string", "format": "password" },
                   "new_password": { "type": "string", "minLength": 8 },
-                  "password": { "type": "string", "minLength": 8 }
+                  "password": { "type": "string", "minLength": 8, "description": "Alias for new_password" }
                 }
               }
             }

@@ -36,11 +36,10 @@ func (s *Server) Handler() http.Handler {
 
 func (s *Server) withCORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		origin := s.Cfg.CORSOrigins
-		if origin == "" {
-			origin = "*"
+		if origin := s.corsOrigin(); origin != "" {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Vary", "Origin")
 		}
-		w.Header().Set("Access-Control-Allow-Origin", origin)
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Service-Key")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS")
 		if r.Method == http.MethodOptions {
@@ -49,6 +48,21 @@ func (s *Server) withCORS(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// corsOrigin: production never emits wildcard *; local may use *.
+func (s *Server) corsOrigin() string {
+	o := strings.TrimSpace(s.Cfg.CORSOrigins)
+	if o == "" {
+		if s.Cfg.AppEnv == "local" || s.Cfg.AppEnv == "development" {
+			return "*"
+		}
+		return ""
+	}
+	if o == "*" && s.Cfg.AppEnv != "local" && s.Cfg.AppEnv != "development" {
+		return ""
+	}
+	return o
 }
 
 func (s *Server) withAuth(next http.HandlerFunc) http.HandlerFunc {
@@ -61,18 +75,18 @@ func (s *Server) withAuth(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
+// authorized: X-Service-Key must match when configured.
+// Production requires a non-empty NOTIFICATIONS_SERVICE_KEY (no unverified Bearer).
+// Local/dev may omit the key for convenience.
 func (s *Server) authorized(r *http.Request) bool {
 	key := strings.TrimSpace(r.Header.Get("X-Service-Key"))
 	if s.Cfg.ServiceKey != "" {
 		return key != "" && key == s.Cfg.ServiceKey
 	}
-	// Local/dev convenience when no service key configured
 	if s.Cfg.AppEnv == "local" || s.Cfg.AppEnv == "development" {
 		return true
 	}
-	// Also accept Bearer present (identity JWT) when service key unset in non-local — still require non-empty
-	auth := strings.TrimSpace(r.Header.Get("Authorization"))
-	return strings.HasPrefix(strings.ToLower(auth), "bearer ") && len(auth) > 10
+	return false
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
@@ -87,13 +101,14 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		st = "degraded"
 	}
 	writeJSON(w, status, map[string]interface{}{
-		"service":           "notifications",
-		"status":            st,
-		"postgres":          ok,
-		"whatsapp":          s.Cfg.WhatsAppConfigured(),
-		"push":              s.Cfg.PushConfigured(),
-		"dry_run":           s.Cfg.DryRun,
-		"runtime":           "go",
+		"service":             "notifications",
+		"status":              st,
+		"postgres":            ok,
+		"whatsapp":            s.Cfg.WhatsAppConfigured(),
+		"push":                s.Cfg.PushConfigured(),
+		"dry_run":             s.Cfg.DryRun,
+		"service_key_set":     s.Cfg.ServiceKey != "",
+		"runtime":             "go",
 	})
 }
 

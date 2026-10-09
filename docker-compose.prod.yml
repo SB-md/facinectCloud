@@ -92,7 +92,7 @@ services:
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       GOOGLE_OAUTH_REDIRECT_URI: ${GOOGLE_OAUTH_REDIRECT_URI}
-      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://cloud.facinect.com}
     volumes:
       - ./keys:/keys:ro
     depends_on:
@@ -139,7 +139,7 @@ services:
       META_PHONE_NUMBER_ID: ${META_PHONE_NUMBER_ID:-}
       META_API_VERSION: ${META_API_VERSION:-v21.0}
       FCM_SERVER_KEY: ${FCM_SERVER_KEY:-}
-      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://cloud.facinect.com}
     depends_on:
       postgres:
         condition: service_healthy
@@ -157,6 +157,7 @@ services:
       - traefik.http.routers.notifications.rule=PathPrefix(`/v1/notifications`)
       - traefik.http.routers.notifications.entrypoints=web
       - traefik.http.routers.notifications.priority=20
+      - traefik.http.routers.notifications.middlewares=rate-notify@file
       - traefik.http.services.notifications.loadbalancer.server.port=8080
     networks:
       - facinect_internal
