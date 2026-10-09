@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import FacilityShell from '../FacilityShell';
 import { FacilityMembership, fetchSession, findFacilityBySlug, getCachedUser } from '../../../../lib/auth';
@@ -233,6 +234,9 @@ function AdminBody() {
           <strong>{staff.filter((s) => s.status === 'active').length}</strong>
         </div>
       </div>
+      <p style={{ marginBottom: 12 }}>
+        <Link href="/add-facility">Add another facility →</Link>
+      </p>
 
       <div className={styles.tabRow}>
         {tabs.map((t) => (

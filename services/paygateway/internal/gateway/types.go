@@ -1,0 +1,65 @@
+package gateway
+
+// CreateRequest is the stable caller contract (saas-billing / booking).
+// AmountPaise is the canonical unit (Razorpay-style); rupees callers may send Amount.
+type CreateRequest struct {
+	Provider  string                 `json:"provider"`
+	Amount    float64                `json:"amount"`       // rupees (optional if amount_paise set)
+	AmountPaise int64                `json:"amount_paise"` // preferred
+	Currency  string                 `json:"currency"`
+	Receipt   string                 `json:"receipt"`
+	Customer  Customer               `json:"customer"`
+	Metadata  map[string]interface{} `json:"metadata"`
+	ReturnURL string                 `json:"return_url"`
+	FacilityID *int64                `json:"facility_id"`
+	Purpose   string                 `json:"purpose"`
+}
+
+type Customer struct {
+	Name  string `json:"name"`
+	Email string `json:"email"`
+	Phone string `json:"phone"`
+}
+
+type CreateResult struct {
+	Provider        string                 `json:"provider"`
+	OrderID         string                 `json:"order_id"`          // our internal id as string
+	ExternalOrderID string                 `json:"external_order_id"` // provider order id
+	Status          string                 `json:"status"`
+	AmountPaise     int64                  `json:"amount_paise"`
+	Currency        string                 `json:"currency"`
+	Receipt         string                 `json:"receipt,omitempty"`
+	Checkout        map[string]interface{} `json:"checkout"`
+}
+
+type VerifyRequest struct {
+	Provider        string `json:"provider"`
+	ExternalOrderID string `json:"external_order_id"`
+	PaymentID       string `json:"payment_id"`
+	Signature       string `json:"signature"`
+}
+
+type VerifyResult struct {
+	Provider        string `json:"provider"`
+	Valid           bool   `json:"valid"`
+	Status          string `json:"status,omitempty"`
+	ExternalOrderID string `json:"external_order_id,omitempty"`
+	PaymentID       string `json:"payment_id,omitempty"`
+	Reason          string `json:"reason,omitempty"`
+}
+
+type NormalizedEvent struct {
+	Provider        string                 `json:"provider"`
+	Type            string                 `json:"type"` // payment.captured | payment.failed | refunded
+	ExternalOrderID string                 `json:"external_order_id,omitempty"`
+	PaymentID       string                 `json:"payment_id,omitempty"`
+	AmountPaise     int64                  `json:"amount_paise,omitempty"`
+	Currency        string                 `json:"currency,omitempty"`
+	Raw             map[string]interface{} `json:"raw,omitempty"`
+}
+
+type ProviderInfo struct {
+	Name       string `json:"name"`
+	Configured bool   `json:"configured"`
+	IsDefault  bool   `json:"is_default"`
+}
