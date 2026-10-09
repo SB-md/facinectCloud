@@ -42,7 +42,7 @@ curl -s -X POST http://localhost:8080/v1/notifications/send \
 
 | Variable | Purpose |
 |----------|---------|
-| `NOTIFICATIONS_SERVICE_KEY` | Required in production (`X-Service-Key`) |
+| `NOTIFICATIONS_SERVICE_KEY` | **Required in production** (`X-Service-Key`). Unverified Bearer is not accepted. Local may omit for convenience. |
 | `NOTIFICATIONS_DRY_RUN` | Force stub sends |
 | `META_WHATSAPP_TOKEN` | Meta Cloud API token |
 | `META_PHONE_NUMBER_ID` | WhatsApp phone number id |
