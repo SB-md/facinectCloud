@@ -60,6 +60,30 @@ const SPECS = [
     blurb: 'Promotions and discount coupons — /v1/offers',
   },
   {
+    id: 'administration',
+    label: 'Administration',
+    url: '/v1/administration/openapi.json',
+    blurb: 'Facility profile, sports, staff, payments — /v1/administration',
+  },
+  {
+    id: 'add-facility',
+    label: 'Add facility',
+    url: '/v1/add-facility/openapi.json',
+    blurb: 'Onboard / additional facility requests — /v1/add-facility',
+  },
+  {
+    id: 'payments',
+    label: 'Payments',
+    url: '/v1/payments/openapi.json',
+    blurb: 'Ledger + summary — /v1/payments',
+  },
+  {
+    id: 'gateway',
+    label: 'Pay gateway',
+    url: '/v1/gateway/openapi.json',
+    blurb: 'Razorpay/stub abstraction — /v1/gateway',
+  },
+  {
     id: 'ai',
     label: 'AI',
     url: '/v1/ai/openapi.json',
@@ -77,6 +101,10 @@ function resolveSpecId(raw: string | null): SpecId {
   if (raw === 'tournaments') return 'tournaments';
   if (raw === 'enquiry') return 'enquiry';
   if (raw === 'offers') return 'offers';
+  if (raw === 'administration') return 'administration';
+  if (raw === 'add-facility' || raw === 'addfacility') return 'add-facility';
+  if (raw === 'payments') return 'payments';
+  if (raw === 'gateway' || raw === 'paygateway') return 'gateway';
   if (raw === 'ai') return 'ai';
   return 'identity';
 }

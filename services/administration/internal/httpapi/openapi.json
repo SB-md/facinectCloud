@@ -1,0 +1,51 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Facinect Administration API",
+    "version": "1.0.0",
+    "description": "Phase 1: facility profile, sports/courts, payment modes, service flags, staff memberships."
+  },
+  "servers": [{ "url": "/" }],
+  "paths": {
+    "/v1/administration/health": {
+      "get": { "summary": "Health", "responses": { "200": { "description": "OK" } } }
+    },
+    "/v1/administration/pages": {
+      "get": { "summary": "Page catalog + role defaults", "responses": { "200": { "description": "pages + role_defaults" } } }
+    },
+    "/v1/administration/facilities/{facilityId}/profile": {
+      "get": { "summary": "Get facility profile", "responses": { "200": { "description": "Profile" } } },
+      "put": { "summary": "Upsert facility profile", "responses": { "200": { "description": "Profile" } } }
+    },
+    "/v1/administration/facilities/{facilityId}/sports": {
+      "get": { "summary": "List sports", "responses": { "200": { "description": "sports[]" } } },
+      "post": { "summary": "Create sport", "responses": { "200": { "description": "Sport" } } }
+    },
+    "/v1/administration/facilities/{facilityId}/courts": {
+      "get": { "summary": "List courts", "responses": { "200": { "description": "courts[]" } } },
+      "post": { "summary": "Create court", "responses": { "200": { "description": "Court" } } }
+    },
+    "/v1/administration/facilities/{facilityId}/payment-settings": {
+      "get": { "summary": "List payment settings", "responses": { "200": { "description": "payment_settings[]" } } },
+      "put": { "summary": "Upsert payment setting", "responses": { "200": { "description": "PaymentSetting" } } }
+    },
+    "/v1/administration/facilities/{facilityId}/services": {
+      "get": { "summary": "Maintenance / service flags", "responses": { "200": { "description": "flags" } } },
+      "put": { "summary": "Update service flags", "responses": { "200": { "description": "flags" } } }
+    },
+    "/v1/administration/facilities/{facilityId}/staff": {
+      "get": { "summary": "List staff memberships", "responses": { "200": { "description": "staff[]" } } },
+      "post": { "summary": "Upsert staff by existing user email", "responses": { "200": { "description": "Staff" } } }
+    },
+    "/v1/administration/facilities/{facilityId}/summary": {
+      "get": { "summary": "Admin summary counts", "responses": { "200": { "description": "summary" } } }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" },
+      "serviceKey": { "type": "apiKey", "in": "header", "name": "X-Service-Key" }
+    }
+  },
+  "security": [{ "bearerAuth": [] }, { "serviceKey": [] }]
+}
