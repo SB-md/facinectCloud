@@ -130,6 +130,9 @@ Put nginx/Caddy on `:443` → `127.0.0.1:8081` for TLS. Keep RoutForge on `:8080
 | GET | `/v1/payments/health` | Payments health |
 | GET | `/v1/payments/facilities/{id}/ledger` | Payment ledger |
 | POST | `/v1/payments/facilities/{id}/payments` | Record ledger entry |
+| GET | `/v1/gateway/health` | Payment gateway abstraction health |
+| POST | `/v1/gateway/orders` | Create provider order (stub/Razorpay) |
+| POST | `/v1/gateway/verify` | Verify payment signature |
 | GET | `/docs` | Swagger UI (Identity / Notifications / Booking) |
 | GET | `/api/health` | Web health |
 | POST | `/v1/auth/check-email` | Email exists? |

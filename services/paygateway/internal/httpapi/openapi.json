@@ -1,0 +1,63 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Facinect Payment Gateway API",
+    "version": "1.0.0",
+    "description": "Integration abstraction for third-party gateways (stub + Razorpay; Cashfree-ready). Does not replace Traefik edge gateway."
+  },
+  "servers": [{ "url": "/" }],
+  "paths": {
+    "/v1/gateway/health": {
+      "get": { "summary": "Health + providers", "responses": { "200": { "description": "OK" } } }
+    },
+    "/v1/gateway/providers": {
+      "get": { "summary": "List providers", "responses": { "200": { "description": "providers[]" } } }
+    },
+    "/v1/gateway/orders": {
+      "post": {
+        "summary": "Create payment order",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "provider": { "type": "string", "description": "razorpay|stub|cashfree; empty = default" },
+                  "amount": { "type": "number", "description": "INR rupees (converted to paise)" },
+                  "amount_paise": { "type": "integer" },
+                  "currency": { "type": "string" },
+                  "receipt": { "type": "string" },
+                  "customer": { "type": "object" },
+                  "metadata": { "type": "object" },
+                  "facility_id": { "type": "integer" },
+                  "purpose": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "CreateResult with checkout payload" } }
+      }
+    },
+    "/v1/gateway/verify": {
+      "post": {
+        "summary": "Verify payment signature",
+        "responses": { "200": { "description": "VerifyResult" } }
+      }
+    },
+    "/v1/gateway/webhooks/{provider}": {
+      "post": {
+        "summary": "Provider webhook (signature verified per adapter)",
+        "responses": { "200": { "description": "NormalizedEvent" } }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" },
+      "serviceKey": { "type": "apiKey", "in": "header", "name": "X-Service-Key" }
+    }
+  },
+  "security": [{ "bearerAuth": [] }, { "serviceKey": [] }]
+}
