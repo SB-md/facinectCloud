@@ -1,12 +1,15 @@
 package auth
 
 import (
+	"bytes"
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
 	"strings"
 	"time"
 
@@ -50,10 +53,15 @@ type TokenPair struct {
 }
 
 type Service struct {
-	DB     *sql.DB
-	JWT    *JWTService
-	Google *GoogleOAuth
-	AppEnv string
+	DB               *sql.DB
+	JWT              *JWTService
+	Google           *GoogleOAuth
+	AppEnv           string
+	NotificationsURL string
+	NotificationsKey string
+	OTPTemplate      string
+	OTPDevInline     bool
+	HTTP             *http.Client
 }
 
 func (s *Service) BootstrapAdmin(email, password, name string) error {
@@ -253,16 +261,90 @@ func (s *Service) RequestOTP(phone string) (map[string]interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	out := map[string]interface{}{
 		"ok":         true,
 		"phone":      phone,
 		"expires_in": 300,
-		"delivery":   "dev_inline",
+		"delivery":   "whatsapp",
 	}
-	if s.AppEnv == "local" {
+
+	if s.OTPDevInline {
+		out["delivery"] = "dev_inline"
 		out["dev_otp"] = code
+		return out, nil
+	}
+
+	if err := s.dispatchOTPWhatsApp(phone, code); err != nil {
+		// Local fallback so engineers can still verify when Meta is down.
+		if s.AppEnv == "local" || s.AppEnv == "development" {
+			out["delivery"] = "dev_inline"
+			out["dev_otp"] = code
+			out["whatsapp_error"] = err.Error()
+			return out, nil
+		}
+		return nil, fmt.Errorf("whatsapp_send_failed: %w", err)
 	}
 	return out, nil
+}
+
+func (s *Service) dispatchOTPWhatsApp(phone, code string) error {
+	base := strings.TrimRight(strings.TrimSpace(s.NotificationsURL), "/")
+	if base == "" {
+		return fmt.Errorf("notifications_url_missing")
+	}
+	tmpl := strings.TrimSpace(s.OTPTemplate)
+	if tmpl == "" {
+		tmpl = "facinect_otp"
+	}
+	payload := map[string]interface{}{
+		"channel":  "whatsapp",
+		"template": tmpl,
+		"to": map[string]string{
+			"whatsapp": phone,
+		},
+		"data": map[string]interface{}{
+			"otp":  code,
+			"code": code,
+		},
+		"priority": "high",
+	}
+	raw, _ := json.Marshal(payload)
+	client := s.HTTP
+	if client == nil {
+		client = &http.Client{Timeout: 20 * time.Second}
+	}
+	req, err := http.NewRequest(http.MethodPost, base+"/v1/notifications/send", bytes.NewReader(raw))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if s.NotificationsKey != "" {
+		req.Header.Set("X-Service-Key", s.NotificationsKey)
+	}
+	res, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	body, _ := io.ReadAll(io.LimitReader(res.Body, 1<<20))
+	if res.StatusCode >= 300 {
+		return fmt.Errorf("notify_http_%d: %s", res.StatusCode, strings.TrimSpace(string(body)))
+	}
+	var job map[string]interface{}
+	_ = json.Unmarshal(body, &job)
+	status := strings.ToLower(fmt.Sprint(job["status"]))
+	if status == "failed" {
+		errText := strings.TrimSpace(fmt.Sprint(job["error_text"]))
+		if errText == "" {
+			errText = "send_failed"
+		}
+		return fmt.Errorf("%s", errText)
+	}
+	if status == "dry_run" {
+		return fmt.Errorf("whatsapp_dry_run")
+	}
+	return nil
 }
 
 func (s *Service) VerifyOTP(phone, code, ip string) (*TokenPair, error) {

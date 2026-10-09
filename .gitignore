@@ -18,3 +18,7 @@ backups/*.sql.gz
 !backups/.gitkeep
 u486535318_*.sql
 
+
+secrets/
+*.pem
+!keys/*.pem.example

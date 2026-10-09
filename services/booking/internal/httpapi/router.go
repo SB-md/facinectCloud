@@ -36,6 +36,13 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /v1/booking/bookings/{bookingId}", s.withAuth(s.handleGetBooking))
 	mux.HandleFunc("POST /v1/booking/bookings/{bookingId}/cancel", s.withAuth(s.handleCancelBooking))
 
+	mux.HandleFunc("POST /v1/booking/facilities/{facilityId}/slots/cleanup", s.withAuth(s.handleCleanupSlots))
+	mux.HandleFunc("POST /v1/booking/facilities/{facilityId}/blocks/recurrence", s.withAuth(s.handleRecurrenceBlocks))
+	mux.HandleFunc("POST /v1/booking/bookings/{bookingId}/collect", s.withAuth(s.handleCollectPayment))
+	mux.HandleFunc("POST /v1/booking/facilities/{facilityId}/coupons", s.withAuth(s.handleCreateCoupons))
+	mux.HandleFunc("POST /v1/booking/users/{userId}/status", s.withAuth(s.handleUserStatus))
+	mux.HandleFunc("POST /v1/booking/facilities/{facilityId}/users/{userId}/status", s.withAuth(s.handleFacilityUserStatus))
+
 	return s.withCORS(mux)
 }
 
@@ -365,6 +372,154 @@ func (s *Server) handleCancelBooking(w http.ResponseWriter, r *http.Request, ac 
 		return
 	}
 	writeJSON(w, http.StatusOK, b)
+}
+
+func (s *Server) handleCleanupSlots(w http.ResponseWriter, r *http.Request, ac *authCtx) {
+	fid, err := pathInt(r, "facilityId")
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_facility_id"})
+		return
+	}
+	if err := s.requireFacility(ac, fid); err != nil {
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": err.Error()})
+		return
+	}
+	n, err := s.Book.CleanupSlots(r.Context(), fid)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"success": true, "deleted": n})
+}
+
+func (s *Server) handleRecurrenceBlocks(w http.ResponseWriter, r *http.Request, ac *authCtx) {
+	fid, err := pathInt(r, "facilityId")
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_facility_id"})
+		return
+	}
+	if err := s.requireFacility(ac, fid); err != nil {
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": err.Error()})
+		return
+	}
+	var in booking.RecurrenceBlockInput
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&in); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_json"})
+		return
+	}
+	n, err := s.Book.CreateRecurrenceBlocks(r.Context(), fid, in)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"success": true, "blocked": n})
+}
+
+func (s *Server) handleCollectPayment(w http.ResponseWriter, r *http.Request, ac *authCtx) {
+	id, err := pathInt(r, "bookingId")
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_booking_id"})
+		return
+	}
+	b, err := s.Book.GetBooking(r.Context(), id)
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "not_found"})
+		return
+	}
+	if err := s.requireFacility(ac, b.FacilityID); err != nil {
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": err.Error()})
+		return
+	}
+	var in booking.CollectPaymentInput
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&in); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_json"})
+		return
+	}
+	b, err = s.Book.CollectPayment(r.Context(), id, in)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, b)
+}
+
+func (s *Server) handleCreateCoupons(w http.ResponseWriter, r *http.Request, ac *authCtx) {
+	fid, err := pathInt(r, "facilityId")
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_facility_id"})
+		return
+	}
+	if err := s.requireFacility(ac, fid); err != nil {
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": err.Error()})
+		return
+	}
+	var in booking.CreateCouponsInput
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&in); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_json"})
+		return
+	}
+	list, err := s.Book.CreateCoupons(r.Context(), fid, in)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"success": true, "coupons": list})
+}
+
+func (s *Server) handleUserStatus(w http.ResponseWriter, r *http.Request, ac *authCtx) {
+	uid, err := pathInt(r, "userId")
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_user_id"})
+		return
+	}
+	var body struct {
+		booking.UserStatusInput
+		FacilityID int64 `json:"facility_id"`
+	}
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&body); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_json"})
+		return
+	}
+	if body.FacilityID <= 0 {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "facility_id_required"})
+		return
+	}
+	if err := s.requireFacility(ac, body.FacilityID); err != nil {
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": err.Error()})
+		return
+	}
+	if err := s.Book.UpdateUserStatus(r.Context(), body.FacilityID, uid, body.UserStatusInput); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"success": true, "user_id": uid, "status": body.Status})
+}
+
+func (s *Server) handleFacilityUserStatus(w http.ResponseWriter, r *http.Request, ac *authCtx) {
+	fid, err := pathInt(r, "facilityId")
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_facility_id"})
+		return
+	}
+	uid, err := pathInt(r, "userId")
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_user_id"})
+		return
+	}
+	if err := s.requireFacility(ac, fid); err != nil {
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": err.Error()})
+		return
+	}
+	var in booking.UserStatusInput
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&in); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_json"})
+		return
+	}
+	if err := s.Book.UpdateUserStatus(r.Context(), fid, uid, in); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"success": true, "user_id": uid, "status": in.Status})
 }
 
 func pathInt(r *http.Request, name string) (int64, error) {

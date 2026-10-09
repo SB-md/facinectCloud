@@ -26,6 +26,13 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /v1/students/facilities/{facilityId}/students/summary", s.withAuth(s.handleSummary))
 	mux.HandleFunc("GET /v1/students/facilities/{facilityId}/students", s.withAuth(s.handleListStudents))
 	mux.HandleFunc("POST /v1/students/facilities/{facilityId}/students", s.withAuth(s.handleEnroll))
+	mux.HandleFunc("POST /v1/students/facilities/{facilityId}/students/{studentId}", s.withAuth(s.handleUpdateStudent))
+
+	mux.HandleFunc("POST /v1/students/facilities/{facilityId}/enrollments/{enrollmentId}/status", s.withAuth(s.handleUpdateStatus))
+	mux.HandleFunc("POST /v1/students/facilities/{facilityId}/enrollments/{enrollmentId}/plan", s.withAuth(s.handleUpdatePlan))
+
+	mux.HandleFunc("GET /v1/students/facilities/{facilityId}/plans", s.withAuth(s.handleListPlans))
+	mux.HandleFunc("POST /v1/students/facilities/{facilityId}/plans", s.withAuth(s.handleCreatePlan))
 
 	mux.HandleFunc("GET /v1/students/facilities/{facilityId}/attendance", s.withAuth(s.handleListAttendance))
 	mux.HandleFunc("POST /v1/students/facilities/{facilityId}/attendance", s.withAuth(s.handleMarkAttendance))
@@ -40,7 +47,7 @@ func (s *Server) withCORS(next http.Handler) http.Handler {
 			w.Header().Set("Vary", "Origin")
 		}
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Service-Key")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS")
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
 			return
@@ -243,6 +250,138 @@ func (s *Server) handleMarkAttendance(w http.ResponseWriter, r *http.Request, ac
 		in.MarkedBy = &uid
 	}
 	row, err := s.Students.MarkAttendance(r.Context(), fid, in)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, row)
+}
+
+func (s *Server) handleUpdateStatus(w http.ResponseWriter, r *http.Request, ac *authCtx) {
+	fid, err := pathInt(r, "facilityId")
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_facility_id"})
+		return
+	}
+	eid, err := pathInt(r, "enrollmentId")
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_enrollment_id"})
+		return
+	}
+	if err := s.requireFacility(ac, fid); err != nil {
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": err.Error()})
+		return
+	}
+	var in students.UpdateStatusInput
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&in); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_json"})
+		return
+	}
+	row, err := s.Students.UpdateEnrollmentStatus(r.Context(), fid, eid, in.Status)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, row)
+}
+
+func (s *Server) handleUpdateStudent(w http.ResponseWriter, r *http.Request, ac *authCtx) {
+	fid, err := pathInt(r, "facilityId")
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_facility_id"})
+		return
+	}
+	sid, err := pathInt(r, "studentId")
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_student_id"})
+		return
+	}
+	if err := s.requireFacility(ac, fid); err != nil {
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": err.Error()})
+		return
+	}
+	var in students.UpdateStudentInput
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&in); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_json"})
+		return
+	}
+	row, err := s.Students.UpdateStudent(r.Context(), fid, sid, in)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, row)
+}
+
+func (s *Server) handleUpdatePlan(w http.ResponseWriter, r *http.Request, ac *authCtx) {
+	fid, err := pathInt(r, "facilityId")
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_facility_id"})
+		return
+	}
+	eid, err := pathInt(r, "enrollmentId")
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_enrollment_id"})
+		return
+	}
+	if err := s.requireFacility(ac, fid); err != nil {
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": err.Error()})
+		return
+	}
+	var in students.UpdatePlanInput
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&in); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_json"})
+		return
+	}
+	row, err := s.Students.UpdatePlan(r.Context(), fid, eid, in)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, row)
+}
+
+func (s *Server) handleListPlans(w http.ResponseWriter, r *http.Request, ac *authCtx) {
+	fid, err := pathInt(r, "facilityId")
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_facility_id"})
+		return
+	}
+	if err := s.requireFacility(ac, fid); err != nil {
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": err.Error()})
+		return
+	}
+	list, err := s.Students.ListPlans(r.Context(), fid)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"plans": list})
+}
+
+func (s *Server) handleCreatePlan(w http.ResponseWriter, r *http.Request, ac *authCtx) {
+	fid, err := pathInt(r, "facilityId")
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_facility_id"})
+		return
+	}
+	if err := s.requireFacility(ac, fid); err != nil {
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": err.Error()})
+		return
+	}
+	var body struct {
+		PlanName string `json:"plan_name"`
+		Name     string `json:"name"`
+	}
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&body); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_json"})
+		return
+	}
+	name := strings.TrimSpace(body.PlanName)
+	if name == "" {
+		name = strings.TrimSpace(body.Name)
+	}
+	row, err := s.Students.CreatePlan(r.Context(), fid, name)
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return

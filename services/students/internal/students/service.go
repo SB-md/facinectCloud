@@ -68,6 +68,31 @@ type MarkAttendanceInput struct {
 	MarkedBy     *int64 `json:"marked_by"`
 }
 
+type UpdateStatusInput struct {
+	Status string `json:"status"`
+}
+
+type UpdateStudentInput struct {
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
+	Email     string `json:"contact_email"`
+	Phone     string `json:"contact_phone"`
+	WhatsApp  string `json:"whatsapp"`
+}
+
+type UpdatePlanInput struct {
+	PlanName  string   `json:"plan_name"`
+	StartDate string   `json:"start_date"`
+	EndDate   string   `json:"end_date"`
+	ActualFee *float64 `json:"actual_fee"`
+}
+
+type PlanRow struct {
+	PlanID   int64  `json:"plan_id"`
+	PlanName string `json:"plan_name"`
+	Count    int    `json:"student_count"`
+}
+
 func (s *Service) ListStudents(ctx context.Context, facilityID int64, sportID *int64, status string) ([]StudentRow, error) {
 	if facilityID <= 0 {
 		return nil, fmt.Errorf("invalid_facility")
@@ -287,9 +312,10 @@ func (s *Service) MarkAttendance(ctx context.Context, facilityID int64, in MarkA
 	}
 
 	var enrFacility int64
+	var enrStatus string
 	err := s.DB.QueryRowContext(ctx, `
-SELECT facility_id FROM student_enrollments WHERE id=$1 AND status='active'`, in.EnrollmentID).
-		Scan(&enrFacility)
+SELECT facility_id, status FROM student_enrollments WHERE id=$1`, in.EnrollmentID).
+		Scan(&enrFacility, &enrStatus)
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("enrollment_not_found")
 	}
@@ -319,6 +345,12 @@ SET status=EXCLUDED.status,
 		return nil, err
 	}
 
+	// Present / late-as-leave on inactive → reactivate (legacy mark_attendance_status1).
+	if status == "present" && enrStatus != "active" {
+		_, _ = s.DB.ExecContext(ctx, `
+UPDATE student_enrollments SET status='active', updated_at=NOW() WHERE id=$1`, in.EnrollmentID)
+	}
+
 	list, err := s.ListAttendance(ctx, facilityID, in.Date)
 	if err != nil {
 		return nil, err
@@ -328,7 +360,164 @@ SET status=EXCLUDED.status,
 			return &list[i], nil
 		}
 	}
-	return nil, fmt.Errorf("attendance_not_found")
+	// Inactive enrollments are omitted from ListAttendance — synthesize row.
+	row, gerr := s.GetEnrollment(ctx, in.EnrollmentID)
+	if gerr != nil {
+		return nil, fmt.Errorf("attendance_not_found")
+	}
+	return &AttendanceRow{
+		EnrollmentID:   row.EnrollmentID,
+		StudentID:      row.StudentID,
+		FacilityID:     row.FacilityID,
+		FirstName:      row.FirstName,
+		LastName:       row.LastName,
+		Phone:          row.Phone,
+		PlanName:       row.PlanName,
+		AttendanceDate: in.Date,
+		Status:         status,
+		Notes:          strings.TrimSpace(in.Notes),
+	}, nil
+}
+
+func (s *Service) UpdateEnrollmentStatus(ctx context.Context, facilityID, enrollmentID int64, status string) (*StudentRow, error) {
+	st := strings.ToLower(strings.TrimSpace(status))
+	if facilityID <= 0 || enrollmentID <= 0 {
+		return nil, fmt.Errorf("invalid_enrollment")
+	}
+	if st != "active" && st != "inactive" && st != "completed" {
+		return nil, fmt.Errorf("invalid_status")
+	}
+	res, err := s.DB.ExecContext(ctx, `
+UPDATE student_enrollments SET status=$1, updated_at=NOW()
+WHERE id=$2 AND facility_id=$3`, st, enrollmentID, facilityID)
+	if err != nil {
+		return nil, err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return nil, fmt.Errorf("enrollment_not_found")
+	}
+	return s.GetEnrollment(ctx, enrollmentID)
+}
+
+func (s *Service) UpdateStudent(ctx context.Context, facilityID, studentID int64, in UpdateStudentInput) (*StudentRow, error) {
+	if facilityID <= 0 || studentID <= 0 {
+		return nil, fmt.Errorf("invalid_student")
+	}
+	first := strings.TrimSpace(in.FirstName)
+	last := strings.TrimSpace(in.LastName)
+	if first == "" {
+		return nil, fmt.Errorf("invalid_student")
+	}
+	// Ensure student belongs to facility via an enrollment.
+	var enrollmentID int64
+	err := s.DB.QueryRowContext(ctx, `
+SELECT id FROM student_enrollments WHERE facility_id=$1 AND student_id=$2
+ORDER BY id DESC LIMIT 1`, facilityID, studentID).Scan(&enrollmentID)
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("student_not_found")
+	}
+	if err != nil {
+		return nil, err
+	}
+	_, err = s.DB.ExecContext(ctx, `
+UPDATE students SET
+  first_name=$1, last_name=$2,
+  contact_email=NULLIF($3,''), contact_phone=NULLIF($4,''), whatsapp=NULLIF($5,''),
+  updated_at=NOW()
+WHERE id=$6`,
+		first, last,
+		strings.TrimSpace(in.Email),
+		strings.TrimSpace(in.Phone),
+		strings.TrimSpace(in.WhatsApp),
+		studentID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return s.GetEnrollment(ctx, enrollmentID)
+}
+
+func (s *Service) UpdatePlan(ctx context.Context, facilityID, enrollmentID int64, in UpdatePlanInput) (*StudentRow, error) {
+	if facilityID <= 0 || enrollmentID <= 0 {
+		return nil, fmt.Errorf("invalid_enrollment")
+	}
+	plan := strings.TrimSpace(in.PlanName)
+	if in.StartDate != "" {
+		if err := validateDate(in.StartDate); err != nil {
+			return nil, err
+		}
+	}
+	if in.EndDate != "" {
+		if err := validateDate(in.EndDate); err != nil {
+			return nil, err
+		}
+	}
+	var start, end, fee interface{}
+	if strings.TrimSpace(in.StartDate) != "" {
+		start = in.StartDate
+	}
+	if strings.TrimSpace(in.EndDate) != "" {
+		end = in.EndDate
+	}
+	if in.ActualFee != nil {
+		fee = *in.ActualFee
+	}
+	res, err := s.DB.ExecContext(ctx, `
+UPDATE student_enrollments SET
+  plan_name=NULLIF($1,''),
+  start_date=COALESCE($2::date, start_date),
+  end_date=COALESCE($3::date, end_date),
+  actual_fee=COALESCE($4, actual_fee),
+  updated_at=NOW()
+WHERE id=$5 AND facility_id=$6`,
+		plan, start, end, fee, enrollmentID, facilityID)
+	if err != nil {
+		return nil, err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return nil, fmt.Errorf("enrollment_not_found")
+	}
+	return s.GetEnrollment(ctx, enrollmentID)
+}
+
+func (s *Service) ListPlans(ctx context.Context, facilityID int64) ([]PlanRow, error) {
+	if facilityID <= 0 {
+		return nil, fmt.Errorf("invalid_facility")
+	}
+	rows, err := s.DB.QueryContext(ctx, `
+SELECT COALESCE(NULLIF(TRIM(plan_name),''),'(No batch)') AS plan_name, COUNT(*)::int
+FROM student_enrollments
+WHERE facility_id=$1
+GROUP BY 1
+ORDER BY 1`, facilityID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []PlanRow{}
+	var id int64 = 1
+	for rows.Next() {
+		var p PlanRow
+		if err := rows.Scan(&p.PlanName, &p.Count); err != nil {
+			return nil, err
+		}
+		p.PlanID = id
+		id++
+		out = append(out, p)
+	}
+	return out, rows.Err()
+}
+
+func (s *Service) CreatePlan(ctx context.Context, facilityID int64, planName string) (*PlanRow, error) {
+	name := strings.TrimSpace(planName)
+	if facilityID <= 0 || name == "" {
+		return nil, fmt.Errorf("invalid_plan")
+	}
+	// Plans are synthetic (plan_name on enrollments). Creating a plan is a no-op
+	// registry row — return the name so UI can assign it on enroll.
+	return &PlanRow{PlanID: time.Now().Unix()%100000 + 1, PlanName: name, Count: 0}, nil
 }
 
 func validateDate(date string) error {

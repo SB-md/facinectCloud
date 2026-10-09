@@ -29,9 +29,15 @@ type Config struct {
 	GoogleClientSecret string
 	GoogleRedirectURI  string
 	CORSOrigins        string
+	NotificationsURL   string
+	NotificationsKey   string
+	OTPTemplate        string
+	OTPDevInline       bool
 }
 
 func FromEnv() Config {
+	devInline := strings.EqualFold(os.Getenv("OTP_DEV_INLINE"), "true") ||
+		strings.EqualFold(os.Getenv("OTP_DEV_INLINE"), "1")
 	return Config{
 		AppEnv:             getenv("APP_ENV", "local"),
 		HTTPAddr:           getenv("HTTP_ADDR", ":8080"),
@@ -55,6 +61,10 @@ func FromEnv() Config {
 		GoogleClientSecret: strings.TrimSpace(os.Getenv("GOOGLE_CLIENT_SECRET")),
 		GoogleRedirectURI:  getenv("GOOGLE_OAUTH_REDIRECT_URI", "http://localhost:8080/v1/auth/google/callback"),
 		CORSOrigins:        getenv("CORS_ORIGINS", "*"),
+		NotificationsURL:   strings.TrimRight(getenv("NOTIFICATIONS_BASE_URL", "http://notifications:8080"), "/"),
+		NotificationsKey:   strings.TrimSpace(os.Getenv("NOTIFICATIONS_SERVICE_KEY")),
+		OTPTemplate:        getenv("OTP_WHATSAPP_TEMPLATE", "facinect_otp"),
+		OTPDevInline:       devInline,
 	}
 }
 

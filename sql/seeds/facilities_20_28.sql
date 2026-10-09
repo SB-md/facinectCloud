@@ -43,3 +43,16 @@ INSERT INTO user_facility_memberships (user_id, facility_id, role, page_access, 
 INSERT INTO users (email, phone_e164, password_hash, full_name, status) VALUES ('bal.job@gmail.com', NULL, NULL, 'Balaji', 'active') ON CONFLICT (email) DO UPDATE SET full_name=EXCLUDED.full_name, password_hash=COALESCE(EXCLUDED.password_hash, users.password_hash), status='active';
 INSERT INTO user_facility_memberships (user_id, facility_id, role, page_access, status) SELECT id, 28, 'sub_admin', '["dashboard","bookings","view_bookings","students","members","tournaments","enquiry"]'::jsonb, 'active' FROM users WHERE email = 'bal.job@gmail.com' ON CONFLICT (user_id, facility_id) DO UPDATE SET role=EXCLUDED.role, page_access=EXCLUDED.page_access, status='active';
 SELECT 'facilities' AS t, COUNT(*)::text AS n FROM facilities WHERE id IN (20,28) UNION ALL SELECT 'memberships_20_28', COUNT(*)::text FROM user_facility_memberships WHERE facility_id IN (20,28);
+-- Facility sports + Hostinger sports_categories ids (PHP get_slots sportId)
+ALTER TABLE facility_sports ADD COLUMN IF NOT EXISTS catalog_sport_id BIGINT NULL;
+INSERT INTO facility_sports (facility_id, name, sort_order, status, catalog_sport_id) VALUES
+  (20, 'Badminton', 0, 'active', 1),
+  (20, 'Tennis', 1, 'active', 2),
+  (20, 'Volleyball', 2, 'active', 8),
+  (20, 'Bowling', 3, 'active', 17),
+  (28, 'Badminton', 0, 'active', 1)
+ON CONFLICT (facility_id, name) DO UPDATE SET
+  status = 'active',
+  sort_order = EXCLUDED.sort_order,
+  catalog_sport_id = EXCLUDED.catalog_sport_id,
+  updated_at = NOW();

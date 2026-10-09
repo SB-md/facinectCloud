@@ -31,6 +31,8 @@ type MemberRow struct {
 	SubscriptionFee *float64 `json:"subscription_fee,omitempty"`
 	PrimaryMember  bool     `json:"primary_member"`
 	Status         string   `json:"status"`
+	PaymentStatus  string   `json:"payment_status,omitempty"`
+	PlanID         *int64   `json:"plan_id,omitempty"`
 	CreatedAt      string   `json:"created_at,omitempty"`
 }
 
@@ -52,6 +54,15 @@ type UpdateStatusInput struct {
 	Status string `json:"status"`
 }
 
+type UpdateProfileInput struct {
+	FullName      string `json:"full_name"`
+	WhatsApp      string `json:"whatsapp"`
+	Phone         string `json:"contact_phone"`
+	TeamName      string `json:"team_name"`
+	Status        string `json:"status"`
+	PrimaryMember *bool  `json:"primary_member"`
+}
+
 func (s *Service) ListMembers(ctx context.Context, facilityID int64, sportID *int64, status string) ([]MemberRow, error) {
 	if facilityID <= 0 {
 		return nil, fmt.Errorf("invalid_facility")
@@ -61,7 +72,8 @@ SELECT mship.id, m.id, mship.facility_id, m.full_name,
        COALESCE(m.contact_email,''), COALESCE(m.contact_phone,''), COALESCE(m.whatsapp,''),
        mship.sport_id, COALESCE(mship.plan_name,''), COALESCE(mship.team_name,''),
        COALESCE(mship.start_date::text,''), COALESCE(mship.end_date::text,''),
-       mship.subscription_fee, mship.primary_member, mship.status, mship.created_at::text
+       mship.subscription_fee, mship.primary_member, mship.status,
+       COALESCE(mship.payment_status,'unpaid'), mship.plan_id, mship.created_at::text
 FROM memberships mship
 JOIN members m ON m.id = mship.member_id
 WHERE mship.facility_id=$1`
@@ -87,12 +99,13 @@ WHERE mship.facility_id=$1`
 	out := []MemberRow{}
 	for rows.Next() {
 		var r MemberRow
-		var sport sql.NullInt64
+		var sport, planID sql.NullInt64
 		var fee sql.NullFloat64
 		if err := rows.Scan(
 			&r.MembershipID, &r.MemberID, &r.FacilityID, &r.FullName,
 			&r.Email, &r.Phone, &r.WhatsApp, &sport, &r.PlanName, &r.TeamName,
-			&r.StartDate, &r.EndDate, &fee, &r.PrimaryMember, &r.Status, &r.CreatedAt,
+			&r.StartDate, &r.EndDate, &fee, &r.PrimaryMember, &r.Status,
+			&r.PaymentStatus, &planID, &r.CreatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -103,6 +116,10 @@ WHERE mship.facility_id=$1`
 		if fee.Valid {
 			v := fee.Float64
 			r.SubscriptionFee = &v
+		}
+		if planID.Valid {
+			v := planID.Int64
+			r.PlanID = &v
 		}
 		out = append(out, r)
 	}
@@ -195,20 +212,22 @@ RETURNING id`,
 
 func (s *Service) GetMembership(ctx context.Context, membershipID int64) (*MemberRow, error) {
 	var r MemberRow
-	var sport sql.NullInt64
+	var sport, planID sql.NullInt64
 	var fee sql.NullFloat64
 	err := s.DB.QueryRowContext(ctx, `
 SELECT mship.id, m.id, mship.facility_id, m.full_name,
        COALESCE(m.contact_email,''), COALESCE(m.contact_phone,''), COALESCE(m.whatsapp,''),
        mship.sport_id, COALESCE(mship.plan_name,''), COALESCE(mship.team_name,''),
        COALESCE(mship.start_date::text,''), COALESCE(mship.end_date::text,''),
-       mship.subscription_fee, mship.primary_member, mship.status, mship.created_at::text
+       mship.subscription_fee, mship.primary_member, mship.status,
+       COALESCE(mship.payment_status,'unpaid'), mship.plan_id, mship.created_at::text
 FROM memberships mship
 JOIN members m ON m.id = mship.member_id
 WHERE mship.id=$1`, membershipID).Scan(
 		&r.MembershipID, &r.MemberID, &r.FacilityID, &r.FullName,
 		&r.Email, &r.Phone, &r.WhatsApp, &sport, &r.PlanName, &r.TeamName,
-		&r.StartDate, &r.EndDate, &fee, &r.PrimaryMember, &r.Status, &r.CreatedAt,
+		&r.StartDate, &r.EndDate, &fee, &r.PrimaryMember, &r.Status,
+		&r.PaymentStatus, &planID, &r.CreatedAt,
 	)
 	if err != nil {
 		return nil, err
@@ -220,6 +239,10 @@ WHERE mship.id=$1`, membershipID).Scan(
 	if fee.Valid {
 		v := fee.Float64
 		r.SubscriptionFee = &v
+	}
+	if planID.Valid {
+		v := planID.Int64
+		r.PlanID = &v
 	}
 	return &r, nil
 }
@@ -238,6 +261,98 @@ WHERE id=$2 AND facility_id=$3`, st, membershipID, facilityID)
 	n, _ := res.RowsAffected()
 	if n == 0 {
 		return nil, fmt.Errorf("not_found")
+	}
+	return s.GetMembership(ctx, membershipID)
+}
+
+// UpdateMembershipProfile updates member contact fields + membership team/primary/status.
+func (s *Service) UpdateMembershipProfile(ctx context.Context, facilityID, membershipID int64, in UpdateProfileInput) (*MemberRow, error) {
+	cur, err := s.GetMembership(ctx, membershipID)
+	if err != nil {
+		return nil, fmt.Errorf("not_found")
+	}
+	if cur.FacilityID != facilityID {
+		return nil, fmt.Errorf("facility_mismatch")
+	}
+
+	name := strings.TrimSpace(in.FullName)
+	if name == "" {
+		name = cur.FullName
+	}
+	wa := strings.TrimSpace(in.WhatsApp)
+	if wa == "" {
+		wa = strings.TrimSpace(in.Phone)
+	}
+	if wa == "" {
+		wa = cur.WhatsApp
+	}
+	phone := strings.TrimSpace(in.Phone)
+	if phone == "" {
+		phone = cur.Phone
+	}
+	if phone == "" {
+		phone = wa
+	}
+	team := strings.TrimSpace(in.TeamName)
+	// Allow clearing team with empty string when key present — keep existing if omitted empty and we can't tell.
+	// Callers always send team_name; empty clears.
+	st := strings.ToLower(strings.TrimSpace(in.Status))
+	if st == "" {
+		st = cur.Status
+	}
+	if st != "active" && st != "inactive" && st != "expired" {
+		return nil, fmt.Errorf("invalid_status")
+	}
+	primary := cur.PrimaryMember
+	if in.PrimaryMember != nil {
+		primary = *in.PrimaryMember
+	}
+
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	_, err = tx.ExecContext(ctx, `
+UPDATE members SET
+  full_name=$1,
+  contact_phone=NULLIF($2,''),
+  whatsapp=NULLIF($3,''),
+  updated_at=NOW()
+WHERE id=$4`, name, phone, wa, cur.MemberID)
+	if err != nil {
+		return nil, err
+	}
+
+	if primary {
+		// One primary membership per member within facility.
+		_, err = tx.ExecContext(ctx, `
+UPDATE memberships SET primary_member=FALSE, updated_at=NOW()
+WHERE facility_id=$1 AND member_id=$2 AND id<>$3 AND primary_member=TRUE`,
+			facilityID, cur.MemberID, membershipID)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	res, err := tx.ExecContext(ctx, `
+UPDATE memberships SET
+  team_name=NULLIF($1,''),
+  primary_member=$2,
+  status=$3,
+  updated_at=NOW()
+WHERE id=$4 AND facility_id=$5`,
+		team, primary, st, membershipID, facilityID)
+	if err != nil {
+		return nil, err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return nil, fmt.Errorf("not_found")
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
 	}
 	return s.GetMembership(ctx, membershipID)
 }

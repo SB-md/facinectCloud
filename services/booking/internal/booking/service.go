@@ -36,20 +36,23 @@ type Slot struct {
 }
 
 type Booking struct {
-	ID            int64  `json:"id"`
-	FacilityID    int64  `json:"facility_id"`
-	SlotID        int64  `json:"slot_id"`
-	UserID        *int64 `json:"user_id,omitempty"`
-	CustomerName  string `json:"customer_name,omitempty"`
-	CustomerPhone string `json:"customer_phone,omitempty"`
-	CustomerEmail string `json:"customer_email,omitempty"`
-	Status        string `json:"status"`
-	Notes         string `json:"notes,omitempty"`
-	SlotDate      string `json:"slot_date,omitempty"`
-	StartTime     string `json:"start_time,omitempty"`
-	EndTime       string `json:"end_time,omitempty"`
-	CourtName     string `json:"court_name,omitempty"`
-	CreatedAt     string `json:"created_at,omitempty"`
+	ID             int64    `json:"id"`
+	FacilityID     int64    `json:"facility_id"`
+	SlotID         int64    `json:"slot_id"`
+	UserID         *int64   `json:"user_id,omitempty"`
+	CustomerName   string   `json:"customer_name,omitempty"`
+	CustomerPhone  string   `json:"customer_phone,omitempty"`
+	CustomerEmail  string   `json:"customer_email,omitempty"`
+	Status         string   `json:"status"`
+	Notes          string   `json:"notes,omitempty"`
+	PaymentStatus  string   `json:"payment_status,omitempty"`
+	PayMode        string   `json:"pay_mode,omitempty"`
+	AmountPaid     *float64 `json:"amount_paid,omitempty"`
+	SlotDate       string   `json:"slot_date,omitempty"`
+	StartTime      string   `json:"start_time,omitempty"`
+	EndTime        string   `json:"end_time,omitempty"`
+	CourtName      string   `json:"court_name,omitempty"`
+	CreatedAt      string   `json:"created_at,omitempty"`
 }
 
 type CreateCourtInput struct {
@@ -370,6 +373,7 @@ func (s *Service) GetBooking(ctx context.Context, id int64) (*Booking, error) {
 	row := s.DB.QueryRowContext(ctx, `
 SELECT b.id, b.facility_id, b.slot_id, b.user_id, COALESCE(b.customer_name,''), COALESCE(b.customer_phone,''),
        COALESCE(b.customer_email,''), b.status, COALESCE(b.notes,''),
+       COALESCE(b.payment_status,'unpaid'), COALESCE(b.pay_mode,''), b.amount_paid,
        s.slot_date::text, s.start_time::text, s.end_time::text, c.name, b.created_at::text
 FROM booking_bookings b
 JOIN booking_slots s ON s.id = b.slot_id
@@ -377,15 +381,21 @@ JOIN booking_courts c ON c.id = s.court_id
 WHERE b.id=$1`, id)
 	var b Booking
 	var userID sql.NullInt64
+	var amount sql.NullFloat64
 	if err := row.Scan(
 		&b.ID, &b.FacilityID, &b.SlotID, &userID, &b.CustomerName, &b.CustomerPhone,
-		&b.CustomerEmail, &b.Status, &b.Notes, &b.SlotDate, &b.StartTime, &b.EndTime, &b.CourtName, &b.CreatedAt,
+		&b.CustomerEmail, &b.Status, &b.Notes, &b.PaymentStatus, &b.PayMode, &amount,
+		&b.SlotDate, &b.StartTime, &b.EndTime, &b.CourtName, &b.CreatedAt,
 	); err != nil {
 		return nil, err
 	}
 	if userID.Valid {
 		v := userID.Int64
 		b.UserID = &v
+	}
+	if amount.Valid {
+		v := amount.Float64
+		b.AmountPaid = &v
 	}
 	return &b, nil
 }
@@ -394,6 +404,7 @@ func (s *Service) ListBookings(ctx context.Context, facilityID int64, date, stat
 	q := `
 SELECT b.id, b.facility_id, b.slot_id, b.user_id, COALESCE(b.customer_name,''), COALESCE(b.customer_phone,''),
        COALESCE(b.customer_email,''), b.status, COALESCE(b.notes,''),
+       COALESCE(b.payment_status,'unpaid'), COALESCE(b.pay_mode,''), b.amount_paid,
        s.slot_date::text, s.start_time::text, s.end_time::text, c.name, b.created_at::text
 FROM booking_bookings b
 JOIN booking_slots s ON s.id = b.slot_id
@@ -433,15 +444,21 @@ WHERE b.facility_id=$1`
 	for rows.Next() {
 		var b Booking
 		var userID sql.NullInt64
+		var amount sql.NullFloat64
 		if err := rows.Scan(
 			&b.ID, &b.FacilityID, &b.SlotID, &userID, &b.CustomerName, &b.CustomerPhone,
-			&b.CustomerEmail, &b.Status, &b.Notes, &b.SlotDate, &b.StartTime, &b.EndTime, &b.CourtName, &b.CreatedAt,
+			&b.CustomerEmail, &b.Status, &b.Notes, &b.PaymentStatus, &b.PayMode, &amount,
+			&b.SlotDate, &b.StartTime, &b.EndTime, &b.CourtName, &b.CreatedAt,
 		); err != nil {
 			return nil, err
 		}
 		if userID.Valid {
 			v := userID.Int64
 			b.UserID = &v
+		}
+		if amount.Valid {
+			v := amount.Float64
+			b.AmountPaid = &v
 		}
 		out = append(out, b)
 	}

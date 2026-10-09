@@ -151,7 +151,9 @@ ON CONFLICT (facility_id) DO UPDATE SET
 // --- Sports ---
 
 type Sport struct {
-	ID         int64  `json:"id"`
+	ID         int64  `json:"id"`       // catalog_sport_id when set (PHP Hostinger id), else pk
+	InternalID int64  `json:"internal_id"`
+	SportID    int64  `json:"sportId"` // same as id — StrollX / PHP dual-stack
 	FacilityID int64  `json:"facility_id"`
 	Name       string `json:"name"`
 	SortOrder  int    `json:"sort_order"`
@@ -159,12 +161,32 @@ type Sport struct {
 }
 
 type SportInput struct {
-	Name      string `json:"name"`
-	SortOrder int    `json:"sort_order"`
+	Name           string `json:"name"`
+	SortOrder      int    `json:"sort_order"`
+	CatalogSportID *int64 `json:"catalog_sport_id,omitempty"`
+	SportID        *int64 `json:"sportId,omitempty"`
+}
+
+func scanSport(pk, facilityID int64, name string, sortOrder int, status string, catalog sql.NullInt64) Sport {
+	r := Sport{
+		InternalID: pk,
+		FacilityID: facilityID,
+		Name:       name,
+		SortOrder:  sortOrder,
+		Status:     status,
+	}
+	if catalog.Valid && catalog.Int64 > 0 {
+		r.ID = catalog.Int64
+		r.SportID = catalog.Int64
+	} else {
+		r.ID = pk
+		r.SportID = pk
+	}
+	return r
 }
 
 func (s *Service) ListSports(ctx context.Context, facilityID int64, status string) ([]Sport, error) {
-	q := `SELECT id, facility_id, name, sort_order, status FROM facility_sports WHERE facility_id=$1`
+	q := `SELECT id, facility_id, name, sort_order, status, catalog_sport_id FROM facility_sports WHERE facility_id=$1`
 	args := []interface{}{facilityID}
 	st := strings.ToLower(strings.TrimSpace(status))
 	if st != "" && st != "all" {
@@ -179,11 +201,14 @@ func (s *Service) ListSports(ctx context.Context, facilityID int64, status strin
 	defer rows.Close()
 	out := []Sport{}
 	for rows.Next() {
-		var r Sport
-		if err := rows.Scan(&r.ID, &r.FacilityID, &r.Name, &r.SortOrder, &r.Status); err != nil {
+		var pk, facilityIDRow int64
+		var name, statusRow string
+		var sortOrder int
+		var catalog sql.NullInt64
+		if err := rows.Scan(&pk, &facilityIDRow, &name, &sortOrder, &statusRow, &catalog); err != nil {
 			return nil, err
 		}
-		out = append(out, r)
+		out = append(out, scanSport(pk, facilityIDRow, name, sortOrder, statusRow, catalog))
 	}
 	return out, rows.Err()
 }
@@ -193,18 +218,29 @@ func (s *Service) CreateSport(ctx context.Context, facilityID int64, in SportInp
 	if facilityID <= 0 || name == "" {
 		return nil, fmt.Errorf("invalid_sport")
 	}
-	var r Sport
+	var catalog interface{}
+	if in.CatalogSportID != nil && *in.CatalogSportID > 0 {
+		catalog = *in.CatalogSportID
+	} else if in.SportID != nil && *in.SportID > 0 {
+		catalog = *in.SportID
+	}
+	var pk, facilityIDRow int64
+	var nameOut, statusRow string
+	var sortOrder int
+	var catalogOut sql.NullInt64
 	err := s.DB.QueryRowContext(ctx, `
-INSERT INTO facility_sports (facility_id, name, sort_order, status)
-VALUES ($1,$2,$3,'active') RETURNING id, facility_id, name, sort_order, status`,
-		facilityID, name, in.SortOrder,
-	).Scan(&r.ID, &r.FacilityID, &r.Name, &r.SortOrder, &r.Status)
+INSERT INTO facility_sports (facility_id, name, sort_order, status, catalog_sport_id)
+VALUES ($1,$2,$3,'active',$4)
+RETURNING id, facility_id, name, sort_order, status, catalog_sport_id`,
+		facilityID, name, in.SortOrder, catalog,
+	).Scan(&pk, &facilityIDRow, &nameOut, &sortOrder, &statusRow, &catalogOut)
 	if err != nil {
 		if strings.Contains(strings.ToLower(err.Error()), "unique") {
 			return nil, fmt.Errorf("sport_exists")
 		}
 		return nil, err
 	}
+	r := scanSport(pk, facilityIDRow, nameOut, sortOrder, statusRow, catalogOut)
 	return &r, nil
 }
 
@@ -213,17 +249,24 @@ func (s *Service) UpdateSportStatus(ctx context.Context, facilityID, sportID int
 	if st != "active" && st != "inactive" {
 		return nil, fmt.Errorf("invalid_status")
 	}
-	var r Sport
+	var pk, facilityIDRow int64
+	var nameOut, statusRow string
+	var sortOrder int
+	var catalogOut sql.NullInt64
 	err := s.DB.QueryRowContext(ctx, `
 UPDATE facility_sports SET status=$1, updated_at=NOW()
-WHERE id=$2 AND facility_id=$3
-RETURNING id, facility_id, name, sort_order, status`, st, sportID, facilityID).Scan(
-		&r.ID, &r.FacilityID, &r.Name, &r.SortOrder, &r.Status,
+WHERE facility_id=$3 AND (id=$2 OR catalog_sport_id=$2)
+RETURNING id, facility_id, name, sort_order, status, catalog_sport_id`, st, sportID, facilityID).Scan(
+		&pk, &facilityIDRow, &nameOut, &sortOrder, &statusRow, &catalogOut,
 	)
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("not_found")
 	}
-	return &r, err
+	if err != nil {
+		return nil, err
+	}
+	r := scanSport(pk, facilityIDRow, nameOut, sortOrder, statusRow, catalogOut)
+	return &r, nil
 }
 
 // --- Courts ---

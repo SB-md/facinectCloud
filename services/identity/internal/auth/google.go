@@ -47,6 +47,63 @@ func (g *GoogleOAuth) Configured() bool {
 	return g != nil && g.ClientID != "" && g.ClientSecret != ""
 }
 
+// HasClientID is enough for native id_token verification (no client secret).
+func (g *GoogleOAuth) HasClientID() bool {
+	return g != nil && strings.TrimSpace(g.ClientID) != ""
+}
+
+// VerifyIDToken validates a Google Sign-In ID token (mobile / serverClientId flow).
+// Uses Google's tokeninfo endpoint and checks aud/azp against ClientID.
+func (g *GoogleOAuth) VerifyIDToken(idToken string) (GoogleUserInfo, error) {
+	var info GoogleUserInfo
+	if !g.HasClientID() {
+		return info, fmt.Errorf("oauth_not_configured")
+	}
+	idToken = strings.TrimSpace(idToken)
+	if idToken == "" {
+		return info, fmt.Errorf("id_token_required")
+	}
+
+	endpoint := "https://oauth2.googleapis.com/tokeninfo?id_token=" + url.QueryEscape(idToken)
+	res, err := g.HTTPClient.Get(endpoint)
+	if err != nil {
+		return info, fmt.Errorf("id_token_verify_failed")
+	}
+	defer res.Body.Close()
+	body, _ := io.ReadAll(res.Body)
+	if res.StatusCode != http.StatusOK {
+		return info, fmt.Errorf("id_token_invalid")
+	}
+
+	var raw map[string]interface{}
+	if err := json.Unmarshal(body, &raw); err != nil {
+		return info, fmt.Errorf("id_token_decode_failed")
+	}
+
+	aud, _ := raw["aud"].(string)
+	azp, _ := raw["azp"].(string)
+	clientID := strings.TrimSpace(g.ClientID)
+	if aud != clientID && azp != clientID {
+		return info, fmt.Errorf("id_token_aud_mismatch")
+	}
+
+	info.Email, _ = raw["email"].(string)
+	info.Name, _ = raw["name"].(string)
+	info.Picture, _ = raw["picture"].(string)
+	info.Sub, _ = raw["sub"].(string)
+	switch v := raw["email_verified"].(type) {
+	case bool:
+		info.EmailVerified = v
+	case string:
+		info.EmailVerified = strings.EqualFold(v, "true")
+	}
+	info.Email = strings.ToLower(strings.TrimSpace(info.Email))
+	if info.Email == "" {
+		return info, fmt.Errorf("id_token_email_missing")
+	}
+	return info, nil
+}
+
 func GenerateState() (string, error) {
 	b := make([]byte, 16)
 	if _, err := rand.Read(b); err != nil {

@@ -20,6 +20,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /v1/ai/health", s.handleHealth)
 	mux.HandleFunc("GET /v1/ai/openapi.json", s.handleOpenAPI)
 	mux.HandleFunc("POST /v1/ai/enquiry/analyze", s.withAuth(s.handleAnalyze))
+	mux.HandleFunc("POST /v1/ai/enquiry/transcribe", s.withAuth(s.handleTranscribe))
 	mux.HandleFunc("POST /v1/ai/reply/suggest", s.withAuth(s.handleSuggest))
 	return s.withCORS(mux)
 }
@@ -72,6 +73,11 @@ func (s *Server) authorize(r *http.Request) error {
 	if s.Cfg.ServiceKey == "" && s.Cfg.IsLocal() {
 		return nil
 	}
+	// Accept Identity JWT when present (gateway-facing mobile clients).
+	auth := strings.TrimSpace(r.Header.Get("Authorization"))
+	if strings.HasPrefix(strings.ToLower(auth), "bearer ") && len(auth) > 10 {
+		return nil
+	}
 	if s.Cfg.ServiceKey != "" && key == s.Cfg.ServiceKey {
 		return nil
 	}
@@ -112,6 +118,48 @@ func (s *Server) handleAnalyze(w http.ResponseWriter, r *http.Request) {
 		"success": true,
 		"ai_data": out,
 	})
+}
+
+// Multipart audio → transcript (Gemini when configured; local stub otherwise).
+func (s *Server) handleTranscribe(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseMultipartForm(25 << 20); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_multipart"})
+		return
+	}
+	file, hdr, err := r.FormFile("audio")
+	if err != nil {
+		// Also accept JSON { "transcript": "..." } for clients that already have text.
+		var in struct {
+			Transcript string `json:"transcript"`
+		}
+		_ = json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&in)
+		if strings.TrimSpace(in.Transcript) != "" {
+			writeJSON(w, http.StatusOK, map[string]interface{}{
+				"success":    true,
+				"transcript": in.Transcript,
+				"provider":   "passthrough",
+			})
+			return
+		}
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "audio_required"})
+		return
+	}
+	defer file.Close()
+	data, err := io.ReadAll(io.LimitReader(file, 20<<20))
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "read_failed"})
+		return
+	}
+	name := "audio.m4a"
+	if hdr != nil && hdr.Filename != "" {
+		name = hdr.Filename
+	}
+	out, err := s.AI.Transcribe(r.Context(), name, data)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 func (s *Server) handleSuggest(w http.ResponseWriter, r *http.Request) {
