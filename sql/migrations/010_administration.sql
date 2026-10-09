@@ -24,12 +24,15 @@ CREATE TABLE IF NOT EXISTS facility_sports (
   sort_order       INT NOT NULL DEFAULT 0,
   status           VARCHAR(16) NOT NULL DEFAULT 'active'
                    CHECK (status IN ('active','inactive')),
+  catalog_sport_id BIGINT NULL,
   created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (facility_id, name)
 );
 CREATE INDEX IF NOT EXISTS idx_facility_sports_facility
   ON facility_sports(facility_id, status);
+ALTER TABLE facility_sports
+  ADD COLUMN IF NOT EXISTS catalog_sport_id BIGINT NULL;
 
 CREATE TABLE IF NOT EXISTS facility_courts (
   id               BIGSERIAL PRIMARY KEY,

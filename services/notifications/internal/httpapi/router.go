@@ -22,9 +22,13 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /v1/notifications/openapi.json", s.handleOpenAPI)
 	mux.HandleFunc("POST /v1/notifications/send", s.withAuth(s.handleSend))
 	mux.HandleFunc("POST /v1/notifications/send-bulk", s.withAuth(s.handleSendBulk))
+	mux.HandleFunc("POST /v1/notifications/service-broadcast", s.withAuth(s.handleServiceBroadcast))
+	mux.HandleFunc("GET /v1/notifications/service-broadcasts", s.withAuth(s.handleListServiceBroadcasts))
 	mux.HandleFunc("GET /v1/notifications/facilities/{facilityId}/whatsapp", s.withAuth(s.handleGetFacilityWA))
 	mux.HandleFunc("PUT /v1/notifications/facilities/{facilityId}/whatsapp", s.withAuth(s.handlePutFacilityWA))
 	mux.HandleFunc("GET /v1/notifications/whatsapp/lookup", s.withAuth(s.handleLookupByPhone))
+	mux.HandleFunc("GET /v1/notifications/history", s.withAuth(s.handleHistory))
+	mux.HandleFunc("GET /v1/notifications/inbox", s.withAuth(s.handleInbox))
 	mux.HandleFunc("GET /v1/notifications/{id}", s.withAuth(s.handleGetJob))
 	mux.HandleFunc("POST /v1/notifications/devices", s.withAuth(s.handleRegisterDevice))
 	return s.withCORS(mux)
@@ -105,6 +109,34 @@ func (s *Server) handleSend(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, job)
+}
+
+func (s *Server) handleServiceBroadcast(w http.ResponseWriter, r *http.Request) {
+	var req notify.ServiceBroadcastRequest
+	if err := json.NewDecoder(io.LimitReader(r.Body, 2<<20)).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_json"})
+		return
+	}
+	result, err := s.Notify.ServiceBroadcast(r.Context(), req)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	status := http.StatusOK
+	if result != nil && !result.OK {
+		status = http.StatusBadRequest
+	}
+	writeJSON(w, status, result)
+}
+
+func (s *Server) handleListServiceBroadcasts(w http.ResponseWriter, r *http.Request) {
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	items, err := s.Notify.ListServiceBroadcasts(r.Context(), limit)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"items": items})
 }
 
 func (s *Server) handleSendBulk(w http.ResponseWriter, r *http.Request) {
@@ -228,6 +260,53 @@ func (s *Server) handleLookupByPhone(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]int64{"facility_id": fid})
+}
+
+func (s *Server) handleHistory(w http.ResponseWriter, r *http.Request) {
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	var facilityID *int64
+	fidStr := strings.TrimSpace(r.URL.Query().Get("facilityId"))
+	if fidStr == "" {
+		fidStr = strings.TrimSpace(r.URL.Query().Get("facility_id"))
+	}
+	if fidStr != "" {
+		n, err := strconv.ParseInt(fidStr, 10, 64)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_facility_id"})
+			return
+		}
+		facilityID = &n
+	}
+	items, err := s.Notify.History(r.Context(), facilityID, limit)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"items": items})
+}
+
+func (s *Server) handleInbox(w http.ResponseWriter, r *http.Request) {
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	var userID *int64
+	uidStr := strings.TrimSpace(r.URL.Query().Get("userId"))
+	if uidStr == "" {
+		uidStr = strings.TrimSpace(r.URL.Query().Get("user_id"))
+	}
+	if uidStr != "" {
+		n, err := strconv.ParseInt(uidStr, 10, 64)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_user_id"})
+			return
+		}
+		userID = &n
+	}
+	email := strings.TrimSpace(r.URL.Query().Get("email"))
+	items, err := s.Notify.Inbox(r.Context(), userID, email, limit)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"items": items})
 }
 
 func writeJSON(w http.ResponseWriter, status int, v interface{}) {

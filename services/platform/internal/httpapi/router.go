@@ -1,0 +1,369 @@
+package httpapi
+
+import (
+	"encoding/json"
+	"io"
+	"net/http"
+	"strconv"
+	"strings"
+
+	"github.com/facinect/platform/internal/authn"
+	"github.com/facinect/platform/internal/config"
+	"github.com/facinect/platform/internal/platform"
+)
+
+type Server struct {
+	Cfg      config.Config
+	Platform *platform.Service
+	JWT      *authn.Verifier
+}
+
+func (s *Server) Handler() http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /v1/platform/health", s.handleHealth)
+
+	mux.HandleFunc("POST /v1/onboarding/status", s.withAuth(s.handleOnboardingStatus))
+	mux.HandleFunc("POST /v1/onboarding/draft/get", s.withAuth(s.handleDraftGet))
+	mux.HandleFunc("POST /v1/onboarding/draft/save", s.withAuth(s.handleDraftSave))
+	mux.HandleFunc("POST /v1/onboarding/submit_facility", s.withAuth(s.handleSubmitFacility))
+	mux.HandleFunc("POST /v1/onboarding/submit_tournament", s.withAuth(s.handleSubmitTournament))
+	mux.HandleFunc("POST /v1/onboarding/submit_referee", s.withAuth(s.handleSubmitReferee))
+	mux.HandleFunc("GET /v1/onboarding/sports", s.withAuth(s.handleSports))
+
+	mux.HandleFunc("GET /v1/news", s.withAuth(s.handleNewsList))
+	mux.HandleFunc("POST /v1/news/save", s.withAuth(s.handleNewsSave))
+	mux.HandleFunc("GET /v1/news/inbox", s.withAuth(s.handleNewsInbox))
+
+	mux.HandleFunc("GET /v1/organisation/profile", s.withAuth(s.handleOrgGet))
+	mux.HandleFunc("POST /v1/organisation/profile", s.withAuth(s.handleOrgSave))
+
+	mux.HandleFunc("GET /v1/controls/sync", s.withAuth(s.handleControlsSync))
+
+	mux.HandleFunc("POST /v1/privacy", s.withAuth(s.handlePrivacy))
+
+	mux.HandleFunc("GET /v1/billing/entitlement", s.withAuth(s.handleBillingEntitlement))
+	mux.HandleFunc("GET /v1/billing/catalog", s.withAuth(s.handleBillingCatalog))
+	mux.HandleFunc("POST /v1/billing/claim_trial", s.withAuth(s.handleClaimTrial))
+	mux.HandleFunc("POST /v1/billing/checkout", s.withAuth(s.handleCheckout))
+	mux.HandleFunc("POST /v1/billing/confirm", s.withAuth(s.handleConfirm))
+
+	return s.withCORS(mux)
+}
+
+func (s *Server) withCORS(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if origin := s.corsOrigin(); origin != "" {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Vary", "Origin")
+		}
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Service-Key")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (s *Server) corsOrigin() string {
+	o := strings.TrimSpace(s.Cfg.CORSOrigins)
+	if o == "" {
+		if s.Cfg.IsLocal() {
+			return "*"
+		}
+		return ""
+	}
+	if o == "*" && !s.Cfg.IsLocal() {
+		return ""
+	}
+	return o
+}
+
+type authCtx struct {
+	Principal *authn.Principal
+	ViaKey    bool
+	Email     string
+}
+
+func (s *Server) withAuth(next func(http.ResponseWriter, *http.Request, *authCtx)) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ac, err := s.authorize(r)
+		if err != nil {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": err.Error()})
+			return
+		}
+		next(w, r, ac)
+	}
+}
+
+// Local auth: allow if APP_ENV=local OR Bearer present OR service key.
+func (s *Server) authorize(r *http.Request) (*authCtx, error) {
+	key := strings.TrimSpace(r.Header.Get("X-Service-Key"))
+	if s.Cfg.ServiceKey != "" && key != "" && key == s.Cfg.ServiceKey {
+		return &authCtx{ViaKey: true}, nil
+	}
+	if s.Cfg.ServiceKey == "" && key != "" {
+		return &authCtx{ViaKey: true}, nil
+	}
+	authz := r.Header.Get("Authorization")
+	if strings.HasPrefix(strings.ToLower(authz), "bearer ") {
+		token := strings.TrimSpace(authz[7:])
+		if token != "" {
+			ac := &authCtx{}
+			if s.JWT != nil {
+				if p, err := s.JWT.ParseAccess(token); err == nil {
+					ac.Principal = p
+					ac.Email = p.Email
+				}
+			}
+			return ac, nil
+		}
+	}
+	if s.Cfg.IsLocal() {
+		return &authCtx{ViaKey: true}, nil
+	}
+	return nil, errUnauthorized
+}
+
+var errUnauthorized = &authError{"unauthorized"}
+
+type authError struct{ s string }
+
+func (e *authError) Error() string { return e.s }
+
+func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+	ok := true
+	if err := s.Platform.DB.Ping(); err != nil {
+		ok = false
+	}
+	status := http.StatusOK
+	st := "ok"
+	if !ok {
+		status = http.StatusServiceUnavailable
+		st = "degraded"
+	}
+	writeJSON(w, status, map[string]interface{}{
+		"service":         "platform",
+		"status":          st,
+		"postgres":        ok,
+		"service_key_set": s.Cfg.ServiceKey != "",
+		"jwt_ready":       s.JWT != nil,
+		"runtime":         "go",
+	})
+}
+
+func (s *Server) handleOnboardingStatus(w http.ResponseWriter, r *http.Request, ac *authCtx) {
+	var in platform.OnboardingStatusIn
+	_ = json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&in)
+	writeJSON(w, http.StatusOK, s.Platform.OnboardingStatus(r.Context(), in))
+}
+
+func (s *Server) handleDraftGet(w http.ResponseWriter, r *http.Request, ac *authCtx) {
+	var in platform.DraftIn
+	_ = json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&in)
+	email := in.Email
+	if email == "" {
+		email = ac.Email
+	}
+	out, err := s.Platform.GetDraft(r.Context(), email)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+func (s *Server) handleDraftSave(w http.ResponseWriter, r *http.Request, ac *authCtx) {
+	var in platform.DraftIn
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&in); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_json"})
+		return
+	}
+	if in.Email == "" {
+		in.Email = ac.Email
+	}
+	out, err := s.Platform.SaveDraft(r.Context(), in)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+func (s *Server) submitKind(w http.ResponseWriter, r *http.Request, ac *authCtx, kind string) {
+	var in platform.SubmitIn
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&in); err != nil {
+		// allow empty body
+		in = platform.SubmitIn{}
+	}
+	if in.Email == "" {
+		in.Email = ac.Email
+	}
+	// store full body as payload if payload empty
+	if len(in.Payload) == 0 {
+		raw, _ := json.Marshal(in)
+		in.Payload = raw
+	}
+	out, err := s.Platform.SubmitOnboarding(r.Context(), kind, in)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+func (s *Server) handleSubmitFacility(w http.ResponseWriter, r *http.Request, ac *authCtx) {
+	s.submitKind(w, r, ac, "facility")
+}
+
+func (s *Server) handleSubmitTournament(w http.ResponseWriter, r *http.Request, ac *authCtx) {
+	s.submitKind(w, r, ac, "tournament")
+}
+
+func (s *Server) handleSubmitReferee(w http.ResponseWriter, r *http.Request, ac *authCtx) {
+	s.submitKind(w, r, ac, "referee")
+}
+
+func (s *Server) handleSports(w http.ResponseWriter, r *http.Request, ac *authCtx) {
+	writeJSON(w, http.StatusOK, s.Platform.SportsCatalog())
+}
+
+func (s *Server) handleNewsList(w http.ResponseWriter, r *http.Request, ac *authCtx) {
+	audience := r.URL.Query().Get("audience")
+	fid, _ := strconv.ParseInt(r.URL.Query().Get("facilityId"), 10, 64)
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	out, err := s.Platform.ListNews(r.Context(), audience, fid, limit)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+func (s *Server) handleNewsSave(w http.ResponseWriter, r *http.Request, ac *authCtx) {
+	var body struct {
+		NewsID int64 `json:"newsId"`
+	}
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&body); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_json"})
+		return
+	}
+	userKey := ac.Email
+	if userKey == "" && ac.Principal != nil {
+		userKey = strconv.FormatInt(ac.Principal.UserID, 10)
+	}
+	out, err := s.Platform.SaveNews(r.Context(), body.NewsID, userKey)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+func (s *Server) handleNewsInbox(w http.ResponseWriter, r *http.Request, ac *authCtx) {
+	userKey := ac.Email
+	if userKey == "" && ac.Principal != nil {
+		userKey = strconv.FormatInt(ac.Principal.UserID, 10)
+	}
+	out, err := s.Platform.NewsInbox(r.Context(), userKey)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+func (s *Server) handleOrgGet(w http.ResponseWriter, r *http.Request, ac *authCtx) {
+	email := r.URL.Query().Get("email")
+	if email == "" {
+		email = ac.Email
+	}
+	out, err := s.Platform.GetOrgProfile(r.Context(), email)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+func (s *Server) handleOrgSave(w http.ResponseWriter, r *http.Request, ac *authCtx) {
+	var in platform.OrgProfileIn
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&in); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_json"})
+		return
+	}
+	if in.Email == "" {
+		in.Email = ac.Email
+	}
+	out, err := s.Platform.SaveOrgProfile(r.Context(), in)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+func (s *Server) handleControlsSync(w http.ResponseWriter, r *http.Request, ac *authCtx) {
+	fid, _ := strconv.ParseInt(r.URL.Query().Get("facilityId"), 10, 64)
+	since := r.URL.Query().Get("since")
+	timeout, _ := strconv.Atoi(r.URL.Query().Get("timeout"))
+	out, err := s.Platform.ControlsSync(r.Context(), fid, since, timeout)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+func (s *Server) handlePrivacy(w http.ResponseWriter, r *http.Request, ac *authCtx) {
+	var in platform.PrivacyIn
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&in); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_json"})
+		return
+	}
+	if in.Email == "" {
+		in.Email = ac.Email
+	}
+	out, err := s.Platform.Privacy(r.Context(), in)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+func (s *Server) handleBillingEntitlement(w http.ResponseWriter, r *http.Request, ac *authCtx) {
+	fid, _ := strconv.ParseInt(r.URL.Query().Get("facilityId"), 10, 64)
+	writeJSON(w, http.StatusOK, s.Platform.BillingEntitlement(fid))
+}
+
+func (s *Server) handleBillingCatalog(w http.ResponseWriter, r *http.Request, ac *authCtx) {
+	writeJSON(w, http.StatusOK, s.Platform.BillingCatalog())
+}
+
+func (s *Server) handleClaimTrial(w http.ResponseWriter, r *http.Request, ac *authCtx) {
+	var body struct {
+		FacilityID int64 `json:"facilityId"`
+	}
+	_ = json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&body)
+	writeJSON(w, http.StatusOK, s.Platform.ClaimTrial(body.FacilityID))
+}
+
+func (s *Server) handleCheckout(w http.ResponseWriter, r *http.Request, ac *authCtx) {
+	var in platform.CheckoutIn
+	_ = json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&in)
+	writeJSON(w, http.StatusOK, s.Platform.Checkout(r.Context(), in))
+}
+
+func (s *Server) handleConfirm(w http.ResponseWriter, r *http.Request, ac *authCtx) {
+	var in platform.ConfirmIn
+	_ = json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&in)
+	writeJSON(w, http.StatusOK, s.Platform.ConfirmBilling(r.Context(), in))
+}
+
+func writeJSON(w http.ResponseWriter, status int, v interface{}) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(v)
+}

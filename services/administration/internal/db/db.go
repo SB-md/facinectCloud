@@ -101,6 +101,10 @@ CREATE TABLE IF NOT EXISTS facility_service_flags (
   customer_enabled   BOOLEAN NOT NULL DEFAULT TRUE,
   updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Hostinger sports_categories.id (PHP get_slots / bookings still use this).
+ALTER TABLE facility_sports
+  ADD COLUMN IF NOT EXISTS catalog_sport_id BIGINT NULL;
 `)
 	return err
 }

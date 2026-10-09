@@ -35,10 +35,14 @@ func main() {
 	}
 
 	svc := &auth.Service{
-		DB:     sqlDB,
-		JWT:    jwtSvc,
-		Google: auth.NewGoogleOAuth(cfg.GoogleClientID, cfg.GoogleClientSecret, cfg.GoogleRedirectURI),
-		AppEnv: cfg.AppEnv,
+		DB:               sqlDB,
+		JWT:              jwtSvc,
+		Google:           auth.NewGoogleOAuth(cfg.GoogleClientID, cfg.GoogleClientSecret, cfg.GoogleRedirectURI),
+		AppEnv:           cfg.AppEnv,
+		NotificationsURL: cfg.NotificationsURL,
+		NotificationsKey: cfg.NotificationsKey,
+		OTPTemplate:      cfg.OTPTemplate,
+		OTPDevInline:     cfg.OTPDevInline,
 	}
 	if err := svc.BootstrapAdmin(cfg.BootstrapEmail, cfg.BootstrapPassword, cfg.BootstrapName); err != nil {
 		log.Fatalf("bootstrap: %v", err)

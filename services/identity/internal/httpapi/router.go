@@ -24,6 +24,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /v1/auth/openapi.json", s.handleOpenAPI)
 	mux.HandleFunc("POST /v1/auth/check-email", s.handleCheckEmail)
 	mux.HandleFunc("POST /v1/auth/login", s.handleLogin)
+	mux.HandleFunc("POST /v1/auth/google", s.handleGoogleIDToken)
 	mux.HandleFunc("GET /v1/auth/google/start", s.handleGoogleStart)
 	mux.HandleFunc("GET /v1/auth/google/callback", s.handleGoogleCallback)
 	mux.HandleFunc("POST /v1/auth/google/handoff", s.handleGoogleHandoff)
@@ -108,7 +109,43 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	password, _ := body["password"].(string)
 	pair, err := s.Auth.LoginWithPassword(email, password, clientIP(r))
 	if err != nil {
+		status := http.StatusUnauthorized
+		if err == auth.ErrNoFacilitiesAssigned {
+			status = http.StatusForbidden
+		}
+		writeJSON(w, status, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, pair)
+}
+
+// handleGoogleIDToken — native Google Sign-In (StrollX / Flutter) id_token → JWT.
+func (s *Server) handleGoogleIDToken(w http.ResponseWriter, r *http.Request) {
+	body := readJSON(r)
+	idToken, _ := body["id_token"].(string)
+	if strings.TrimSpace(idToken) == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "id_token_required"})
+		return
+	}
+	if s.Auth.Google == nil || !s.Auth.Google.HasClientID() {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "oauth_not_configured"})
+		return
+	}
+	info, err := s.Auth.Google.VerifyIDToken(idToken)
+	if err != nil {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": err.Error()})
+		return
+	}
+	pair, err := s.Auth.LoginWithGoogle(info, clientIP(r))
+	if err != nil {
+		status := http.StatusUnauthorized
+		switch err {
+		case auth.ErrNoFacilitiesAssigned:
+			status = http.StatusForbidden
+		case auth.ErrEmailNotVerified:
+			status = http.StatusForbidden
+		}
+		writeJSON(w, status, map[string]string{"error": err.Error()})
 		return
 	}
 	writeJSON(w, http.StatusOK, pair)

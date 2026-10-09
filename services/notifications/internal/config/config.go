@@ -18,11 +18,13 @@ type Config struct {
 	RedisPort          string
 	ServiceKey         string
 	CORSOrigins        string
-	MetaWhatsAppToken  string
-	MetaPhoneNumberID  string
-	MetaAPIVersion     string
-	FCMServerKey       string
-	DryRun             bool
+	MetaWhatsAppToken      string
+	MetaPhoneNumberID      string
+	MetaAPIVersion         string
+	FCMServerKey           string
+	FCMServiceAccountJSON  string
+	FCMProjectID           string
+	DryRun                 bool
 }
 
 func FromEnv() Config {
@@ -44,11 +46,13 @@ func FromEnv() Config {
 		RedisPort:         getenv("REDIS_PORT", "6379"),
 		ServiceKey:        strings.TrimSpace(os.Getenv("NOTIFICATIONS_SERVICE_KEY")),
 		CORSOrigins:       getenv("CORS_ORIGINS", "*"),
-		MetaWhatsAppToken: strings.TrimSpace(os.Getenv("META_WHATSAPP_TOKEN")),
-		MetaPhoneNumberID: strings.TrimSpace(os.Getenv("META_PHONE_NUMBER_ID")),
-		MetaAPIVersion:    getenv("META_API_VERSION", "v21.0"),
-		FCMServerKey:      strings.TrimSpace(os.Getenv("FCM_SERVER_KEY")),
-		DryRun:            dry,
+		MetaWhatsAppToken:     strings.TrimSpace(os.Getenv("META_WHATSAPP_TOKEN")),
+		MetaPhoneNumberID:     strings.TrimSpace(os.Getenv("META_PHONE_NUMBER_ID")),
+		MetaAPIVersion:        getenv("META_API_VERSION", "v21.0"),
+		FCMServerKey:          strings.TrimSpace(os.Getenv("FCM_SERVER_KEY")),
+		FCMServiceAccountJSON: strings.TrimSpace(os.Getenv("FCM_SERVICE_ACCOUNT_JSON")),
+		FCMProjectID:          strings.TrimSpace(os.Getenv("FCM_PROJECT_ID")),
+		DryRun:                dry,
 	}
 }
 
@@ -57,6 +61,11 @@ func (c Config) WhatsAppConfigured() bool {
 }
 
 func (c Config) PushConfigured() bool {
+	if c.FCMServiceAccountJSON != "" {
+		if st, err := os.Stat(c.FCMServiceAccountJSON); err == nil && !st.IsDir() {
+			return true
+		}
+	}
 	return c.FCMServerKey != ""
 }
 

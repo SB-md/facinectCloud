@@ -95,12 +95,18 @@ services:
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       GOOGLE_OAUTH_REDIRECT_URI: ${GOOGLE_OAUTH_REDIRECT_URI:-http://localhost:8080/v1/auth/google/callback}
       CORS_ORIGINS: "*"
+      NOTIFICATIONS_BASE_URL: http://notifications:8080
+      NOTIFICATIONS_SERVICE_KEY: ${NOTIFICATIONS_SERVICE_KEY:-}
+      OTP_WHATSAPP_TEMPLATE: ${OTP_WHATSAPP_TEMPLATE:-facinect_otp}
+      OTP_DEV_INLINE: ${OTP_DEV_INLINE:-false}
     volumes:
       - ./keys:/keys:ro
     depends_on:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      notifications:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/v1/auth/health | grep -q '\"status\":\"ok\"'"]
@@ -136,12 +142,16 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       NOTIFICATIONS_SERVICE_KEY: ${NOTIFICATIONS_SERVICE_KEY:-}
-      NOTIFICATIONS_DRY_RUN: ${NOTIFICATIONS_DRY_RUN:-true}
+      NOTIFICATIONS_DRY_RUN: ${NOTIFICATIONS_DRY_RUN:-false}
       META_WHATSAPP_TOKEN: ${META_WHATSAPP_TOKEN:-}
       META_PHONE_NUMBER_ID: ${META_PHONE_NUMBER_ID:-}
       META_API_VERSION: ${META_API_VERSION:-v21.0}
       FCM_SERVER_KEY: ${FCM_SERVER_KEY:-}
+      FCM_SERVICE_ACCOUNT_JSON: ${FCM_SERVICE_ACCOUNT_JSON:-/secrets/fcm_service_account.json}
+      FCM_PROJECT_ID: ${FCM_PROJECT_ID:-}
       CORS_ORIGINS: "*"
+    volumes:
+      - ./secrets/fcm_service_account.json:/secrets/fcm_service_account.json:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -269,12 +279,16 @@ services:
       JWT_ISSUER: ${JWT_ISSUER}
       JWT_AUDIENCE: ${JWT_AUDIENCE}
       CORS_ORIGINS: "*"
+      NOTIFICATIONS_BASE_URL: http://notifications:8080
+      NOTIFICATIONS_SERVICE_KEY: ${NOTIFICATIONS_SERVICE_KEY:-}
     volumes:
       - ./keys:/keys:ro
     depends_on:
       postgres:
         condition: service_healthy
       identity:
+        condition: service_healthy
+      notifications:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/v1/members/health | grep -q '\"status\":\"ok\"'"]
@@ -311,12 +325,16 @@ services:
       JWT_ISSUER: ${JWT_ISSUER}
       JWT_AUDIENCE: ${JWT_AUDIENCE}
       CORS_ORIGINS: "*"
+      NOTIFICATIONS_BASE_URL: http://notifications:8080
+      NOTIFICATIONS_SERVICE_KEY: ${NOTIFICATIONS_SERVICE_KEY:-}
     volumes:
       - ./keys:/keys:ro
     depends_on:
       postgres:
         condition: service_healthy
       identity:
+        condition: service_healthy
+      notifications:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/v1/tournaments/health | grep -q '\"status\":\"ok\"'"]
@@ -632,6 +650,121 @@ services:
       - facinect_internal
     restart: unless-stopped
 
+
+  platform:
+    build:
+      context: ./services/platform
+      dockerfile: Dockerfile
+    container_name: facinect-platform
+    environment:
+      APP_ENV: local
+      HTTP_ADDR: ":8080"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: ${POSTGRES_IDENTITY_DB}
+      DB_USER: ${POSTGRES_IDENTITY_USER}
+      DB_PASSWORD: ${POSTGRES_IDENTITY_PASSWORD}
+      PLATFORM_SERVICE_KEY: ${PLATFORM_SERVICE_KEY:-}
+      PAYGATEWAY_URL: ${PAYGATEWAY_URL:-http://paygateway:8080}
+      PAYGATEWAY_SERVICE_KEY: ${PAYGATEWAY_SERVICE_KEY:-}
+      JWT_PUBLIC_KEY_PATH: /keys/jwt_public.pem
+      JWT_ISSUER: ${JWT_ISSUER}
+      JWT_AUDIENCE: ${JWT_AUDIENCE}
+      CORS_ORIGINS: "*"
+    volumes:
+      - ./keys:/keys:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      identity:
+        condition: service_healthy
+      paygateway:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/v1/platform/health | grep -q '\"status\":\"ok\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=facinect_internal
+      - traefik.http.services.platform.loadbalancer.server.port=8080
+      - traefik.http.routers.platform.rule=PathPrefix(`/v1/platform`)
+      - traefik.http.routers.platform.entrypoints=web
+      - traefik.http.routers.platform.priority=20
+      - traefik.http.routers.platform.service=platform
+      - traefik.http.routers.platform-onboarding.rule=PathPrefix(`/v1/onboarding`)
+      - traefik.http.routers.platform-onboarding.entrypoints=web
+      - traefik.http.routers.platform-onboarding.priority=20
+      - traefik.http.routers.platform-onboarding.service=platform
+      - traefik.http.routers.platform-news.rule=PathPrefix(`/v1/news`)
+      - traefik.http.routers.platform-news.entrypoints=web
+      - traefik.http.routers.platform-news.priority=20
+      - traefik.http.routers.platform-news.service=platform
+      - traefik.http.routers.platform-organisation.rule=PathPrefix(`/v1/organisation`)
+      - traefik.http.routers.platform-organisation.entrypoints=web
+      - traefik.http.routers.platform-organisation.priority=20
+      - traefik.http.routers.platform-organisation.service=platform
+      - traefik.http.routers.platform-controls.rule=PathPrefix(`/v1/controls`)
+      - traefik.http.routers.platform-controls.entrypoints=web
+      - traefik.http.routers.platform-controls.priority=20
+      - traefik.http.routers.platform-controls.service=platform
+      - traefik.http.routers.platform-privacy.rule=PathPrefix(`/v1/privacy`)
+      - traefik.http.routers.platform-privacy.entrypoints=web
+      - traefik.http.routers.platform-privacy.priority=20
+      - traefik.http.routers.platform-privacy.service=platform
+      - traefik.http.routers.platform-billing.rule=PathPrefix(`/v1/billing`)
+      - traefik.http.routers.platform-billing.entrypoints=web
+      - traefik.http.routers.platform-billing.priority=20
+      - traefik.http.routers.platform-billing.service=platform
+    networks:
+      - facinect_internal
+    restart: unless-stopped
+
+  app:
+    build:
+      context: ./services/app
+      dockerfile: Dockerfile
+    container_name: facinect-app
+    environment:
+      APP_ENV: local
+      HTTP_ADDR: ":8080"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: ${POSTGRES_IDENTITY_DB}
+      DB_USER: ${POSTGRES_IDENTITY_USER}
+      DB_PASSWORD: ${POSTGRES_IDENTITY_PASSWORD}
+      APP_SERVICE_KEY: ${APP_SERVICE_KEY:-}
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-rzp_test_local}
+      JWT_PUBLIC_KEY_PATH: /keys/jwt_public.pem
+      JWT_ISSUER: ${JWT_ISSUER}
+      JWT_AUDIENCE: ${JWT_AUDIENCE}
+      CORS_ORIGINS: "*"
+    volumes:
+      - ./keys:/keys:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      identity:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/v1/app/health | grep -q '\"status\":\"ok\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=facinect_internal
+      - traefik.http.services.app.loadbalancer.server.port=8080
+      - traefik.http.routers.app.rule=PathPrefix(`/v1/app`)
+      - traefik.http.routers.app.entrypoints=web
+      - traefik.http.routers.app.priority=20
+      - traefik.http.routers.app.service=app
+    networks:
+      - facinect_internal
+    restart: unless-stopped
 
   web:
     build:

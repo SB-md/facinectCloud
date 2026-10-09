@@ -3,10 +3,12 @@ package analyze
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"path"
 	"regexp"
 	"strings"
 	"time"
@@ -84,6 +86,24 @@ func (s *Service) AnalyzeEnquiry(ctx context.Context, transcript string) (Analyz
 	return s.geminiAnalyze(ctx, transcript)
 }
 
+// Transcribe returns PHP-shaped {success, transcript, diarized_entries?, provider}.
+func (s *Service) Transcribe(ctx context.Context, filename string, audio []byte) (map[string]interface{}, error) {
+	if len(audio) == 0 {
+		return nil, fmt.Errorf("audio_empty")
+	}
+	if s.Cfg.GeminiAPIKey == "" {
+		_ = ctx
+		_ = filename
+		return map[string]interface{}{
+			"success":    true,
+			"transcript": "CUSTOMER: (local stub — set GEMINI_API_KEY for real transcription)\n\nCOACH: Noted.",
+			"provider":   "stub",
+			"bytes":      len(audio),
+		}, nil
+	}
+	return s.geminiTranscribe(ctx, filename, audio)
+}
+
 func (s *Service) SuggestReply(ctx context.Context, facilityName, customerName string, ai AnalyzeResult) (string, error) {
 	intent, _ := ai["intent_summary"].(string)
 	category, _ := ai["category"].(string)
@@ -151,8 +171,14 @@ type geminiContent struct {
 	Parts []geminiPart `json:"parts"`
 }
 
+type geminiInlineData struct {
+	MimeType string `json:"mimeType"`
+	Data     string `json:"data"`
+}
+
 type geminiPart struct {
-	Text string `json:"text"`
+	Text       string            `json:"text,omitempty"`
+	InlineData *geminiInlineData `json:"inlineData,omitempty"`
 }
 
 type geminiResp struct {
@@ -230,4 +256,107 @@ func stripCodeFence(s string) string {
 		return strings.TrimSpace(m[1])
 	}
 	return s
+}
+
+func audioMime(filename string) string {
+	ext := strings.ToLower(path.Ext(filename))
+	switch ext {
+	case ".mp3":
+		return "audio/mpeg"
+	case ".wav":
+		return "audio/wav"
+	case ".m4a", ".mp4":
+		return "audio/mp4"
+	case ".ogg", ".oga":
+		return "audio/ogg"
+	case ".webm":
+		return "audio/webm"
+	case ".flac":
+		return "audio/flac"
+	case ".aac":
+		return "audio/aac"
+	default:
+		return "audio/wav"
+	}
+}
+
+const transcribePrompt = `Transcribe this sports facility enquiry audio.
+
+Return plain text only (no JSON). Prefer diarized lines:
+CUSTOMER: ...
+COACH: ...
+If speakers are unclear, return a single continuous transcript.`
+
+func (s *Service) geminiTranscribe(ctx context.Context, filename string, audio []byte) (map[string]interface{}, error) {
+	// Cap upload size for generateContent inline (~20MB practical).
+	const maxBytes = 18 << 20
+	if len(audio) > maxBytes {
+		audio = audio[:maxBytes]
+	}
+	model := s.Cfg.GeminiModel
+	url := fmt.Sprintf(
+		"https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s",
+		model, s.Cfg.GeminiAPIKey,
+	)
+	b64 := base64.StdEncoding.EncodeToString(audio)
+	body := geminiReq{
+		Contents: []geminiContent{{
+			Parts: []geminiPart{
+				{Text: transcribePrompt},
+				{InlineData: &geminiInlineData{
+					MimeType: audioMime(filename),
+					Data:     b64,
+				}},
+			},
+		}},
+		GenerationConfig: map[string]interface{}{
+			"temperature": 0.1,
+		},
+	}
+	raw, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(raw))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	res, err := s.Client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+	respBody, _ := io.ReadAll(io.LimitReader(res.Body, 2<<20))
+	if res.StatusCode >= 300 {
+		return nil, fmt.Errorf("gemini_http_%d: %s", res.StatusCode, truncate(string(respBody), 180))
+	}
+	var gr geminiResp
+	if err := json.Unmarshal(respBody, &gr); err != nil {
+		return nil, err
+	}
+	if gr.Error != nil && gr.Error.Message != "" {
+		return nil, fmt.Errorf("gemini: %s", gr.Error.Message)
+	}
+	if len(gr.Candidates) == 0 || len(gr.Candidates[0].Content.Parts) == 0 {
+		return nil, fmt.Errorf("gemini_empty")
+	}
+	transcript := strings.TrimSpace(gr.Candidates[0].Content.Parts[0].Text)
+	if transcript == "" {
+		return nil, fmt.Errorf("transcript_empty")
+	}
+	return map[string]interface{}{
+		"success":    true,
+		"transcript": transcript,
+		"provider":   "gemini",
+		"bytes":      len(audio),
+		"filename":   filename,
+	}, nil
+}
+
+func truncate(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n]
 }
