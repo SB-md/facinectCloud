@@ -5,13 +5,21 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/facinect/platform/internal/config"
+)
+
+var (
+	ErrDuplicateOnboarding = errors.New("duplicate_onboarding")
+	nonDigitRE             = regexp.MustCompile(`\D+`)
 )
 
 type Service struct {
@@ -107,20 +115,160 @@ type SubmitIn struct {
 	Payload        json.RawMessage `json:"payload"`
 }
 
+func normalizeEmail(v string) string {
+	return strings.TrimSpace(strings.ToLower(v))
+}
+
+func normalizeWhatsApp(v string) string {
+	return nonDigitRE.ReplaceAllString(strings.TrimSpace(v), "")
+}
+
+func normalizeMapsURL(v string) string {
+	v = strings.TrimSpace(strings.ToLower(v))
+	if v == "" {
+		return ""
+	}
+	u, err := url.Parse(v)
+	if err != nil || u.Host == "" {
+		return strings.TrimRight(v, "/")
+	}
+	// Host + path only (ignore query noise like utm_*).
+	path := strings.TrimRight(u.EscapedPath(), "/")
+	if path == "" {
+		path = "/"
+	}
+	return u.Host + path
+}
+
+func payloadString(m map[string]interface{}, keys ...string) string {
+	for _, k := range keys {
+		if raw, ok := m[k]; ok && raw != nil {
+			if s := strings.TrimSpace(fmt.Sprint(raw)); s != "" && s != "<nil>" {
+				return s
+			}
+		}
+	}
+	return ""
+}
+
+func (s *Service) findDuplicateOnboarding(
+	ctx context.Context,
+	kind, email, wa, mapsURL string,
+) (int64, string, error) {
+	// Active pipeline only — rejected/closed may re-apply.
+	const active = `status IN ('submitted','approved','pending','active')`
+	if email != "" {
+		var id int64
+		err := s.DB.QueryRowContext(ctx, `
+SELECT id FROM platform_onboarding_requests
+WHERE kind=$1 AND `+active+` AND lower(trim(COALESCE(email,'')))=$2
+ORDER BY id DESC LIMIT 1`, kind, email).Scan(&id)
+		if err == nil {
+			return id, "email", nil
+		}
+		if err != sql.ErrNoRows {
+			return 0, "", err
+		}
+	}
+	if wa != "" {
+		var id int64
+		err := s.DB.QueryRowContext(ctx, `
+SELECT id FROM platform_onboarding_requests
+WHERE kind=$1 AND `+active+`
+  AND regexp_replace(
+        COALESCE(NULLIF(whatsapp_number,''), payload->>'whatsappNumber', payload->>'phone', ''),
+        '\D', '', 'g'
+      ) = $2
+ORDER BY id DESC LIMIT 1`, kind, wa).Scan(&id)
+		if err == nil {
+			return id, "whatsapp", nil
+		}
+		if err != sql.ErrNoRows {
+			return 0, "", err
+		}
+	}
+	if kind == "facility" && mapsURL != "" {
+		var id int64
+		// Normalize stored URL the same way as normalizeMapsURL (host+path, no query).
+		err := s.DB.QueryRowContext(ctx, `
+SELECT id FROM platform_onboarding_requests
+WHERE kind=$1 AND `+active+`
+  AND lower(trim(trailing '/' from split_part(
+        replace(replace(
+          COALESCE(
+            NULLIF(trim(payload->>'googleMapUrl'), ''),
+            NULLIF(trim(payload->>'google_map_url'), ''),
+            NULLIF(trim(payload->>'locationUrl'), ''),
+            ''
+          ),
+          'https://', ''), 'http://', ''),
+        '?', 1
+      ))) = $2
+ORDER BY id DESC LIMIT 1`, kind, mapsURL).Scan(&id)
+		if err == nil {
+			return id, "googleMapUrl", nil
+		}
+		if err != sql.ErrNoRows {
+			return 0, "", err
+		}
+	}
+	return 0, "", nil
+}
+
 func (s *Service) SubmitOnboarding(ctx context.Context, kind string, in SubmitIn) (map[string]interface{}, error) {
 	kind = strings.TrimSpace(strings.ToLower(kind))
+	switch kind {
+	case "facility", "tournament", "referee":
+	default:
+		return nil, fmt.Errorf("invalid_kind")
+	}
 	payload := in.Payload
 	if len(payload) == 0 {
 		payload = []byte("{}")
 	}
+	var payloadMap map[string]interface{}
+	_ = json.Unmarshal(payload, &payloadMap)
+	if payloadMap == nil {
+		payloadMap = map[string]interface{}{}
+	}
+
+	email := normalizeEmail(in.Email)
+	if email == "" {
+		email = normalizeEmail(payloadString(payloadMap, "email"))
+	}
+	wa := normalizeWhatsApp(in.WhatsappNumber)
+	if wa == "" {
+		wa = normalizeWhatsApp(payloadString(payloadMap, "whatsappNumber", "phone"))
+	}
+	mapsURL := ""
+	if kind == "facility" {
+		mapsURL = normalizeMapsURL(payloadString(payloadMap, "googleMapUrl", "google_map_url", "locationUrl"))
+	}
+
+	if dupID, field, err := s.findDuplicateOnboarding(ctx, kind, email, wa, mapsURL); err != nil {
+		return nil, err
+	} else if dupID > 0 {
+		return map[string]interface{}{
+			"success": false,
+			"error":   ErrDuplicateOnboarding.Error(),
+			"message": "Already submitted — wait for approval.",
+			"data": map[string]interface{}{
+				"id":           dupID,
+				"kind":         kind,
+				"matched_by":   field,
+				"existing_id":  dupID,
+			},
+		}, ErrDuplicateOnboarding
+	}
+
 	var id int64
 	err := s.DB.QueryRowContext(ctx, `
 INSERT INTO platform_onboarding_requests (kind, email, whatsapp_number, payload, status)
 VALUES ($1, NULLIF($2,''), NULLIF($3,''), $4::jsonb, 'submitted')
 RETURNING id`,
 		kind,
-		strings.TrimSpace(strings.ToLower(in.Email)),
-		strings.TrimSpace(in.WhatsappNumber),
+		email,
+		wa,
 		string(payload),
 	).Scan(&id)
 	if err != nil {

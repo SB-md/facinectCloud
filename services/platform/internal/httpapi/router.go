@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"strconv"
@@ -207,6 +208,17 @@ func (s *Server) submitKind(w http.ResponseWriter, r *http.Request, ac *authCtx,
 	}
 	out, err := s.Platform.SubmitOnboarding(r.Context(), kind, in)
 	if err != nil {
+		if errors.Is(err, platform.ErrDuplicateOnboarding) {
+			if out == nil {
+				out = map[string]interface{}{
+					"success": false,
+					"error":   "duplicate_onboarding",
+					"message": "Already submitted — wait for approval.",
+				}
+			}
+			writeJSON(w, http.StatusConflict, out)
+			return
+		}
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
 	}
